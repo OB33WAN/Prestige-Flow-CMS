@@ -80,22 +80,38 @@
       var summaryHeading = parsed.querySelector('main h2');
       var summaryParagraph = summaryHeading && summaryHeading.closest('section')?.querySelector('p');
       if (summaryParagraph) summaryParagraph.textContent = value(entry, 'service_summary') || summaryParagraph.textContent;
-    } else if (group === 'industries' && slug !== 'overview') {
-      var sections = entry.getIn(['data', 'sections']);
-      var edits = sections && sections.toJS ? sections.toJS() : [];
-      var headings = parsed.querySelectorAll('main h2');
-      edits.slice(0, 3).forEach(function (section, index) {
-        if (!headings[index]) return;
-        headings[index].textContent = section.heading || headings[index].textContent;
-        var paragraph = headings[index].closest('section')?.querySelector('p');
-        if (paragraph && section.body) paragraph.textContent = section.body;
-      });
     }
+
+    var copyFields = entry && entry.getIn && entry.getIn(['data', 'page_copy']);
+    var copyEdits = copyFields && copyFields.toJS ? copyFields.toJS() : [];
+    copyEdits.forEach(function (field) {
+      var match = String(field.key || '').match(/^(h2|h3|p|li|faq-answer):(\d+)$/u);
+      if (!match) return;
+      var target = match[1] === 'faq-answer'
+        ? parsed.querySelectorAll('main [data-testid^="text-answer"]')[Number(match[2])]
+        : parsed.querySelectorAll('main ' + match[1])[Number(match[2])];
+      if (!target || !field.text) return;
+      if (match[1] === 'faq-answer') {
+        var answerCopy = target.querySelector('.leading-relaxed') || target;
+        answerCopy.textContent = field.text;
+      } else if (match[1] === 'h3' && target.querySelector('button')) {
+        var faqButton = target.querySelector('button');
+        var faqText = Array.from(faqButton.childNodes).find(function (node) { return node.nodeType === 3; });
+        if (faqText) faqText.nodeValue = field.text;
+      } else {
+        target.textContent = field.text;
+      }
+    });
 
     parsed.querySelectorAll('script,style,iframe,object,embed').forEach(function (node) { node.remove(); });
     // Keep disclosure content visible in the CMS preview so editors can review
     // postcode lists and other details that the live page initially collapses.
     parsed.querySelectorAll('details').forEach(function (node) { node.open = true; });
+    parsed.querySelectorAll('[data-testid^="text-answer"]').forEach(function (node) {
+      node.removeAttribute('hidden');
+      node.removeAttribute('aria-hidden');
+      node.setAttribute('data-state', 'open');
+    });
     parsed.querySelectorAll('*').forEach(function (node) {
       Array.from(node.attributes).forEach(function (attribute) {
         if (/^on/iu.test(attribute.name)) node.removeAttribute(attribute.name);

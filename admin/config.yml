@@ -37,9 +37,22 @@ collections:
       - { label: Main heading (H1), name: heading, widget: string, required: true }
       - { label: Introductory copy, name: intro, widget: text, required: true }
       - { label: Service overview copy, name: service_summary, widget: text, required: true }
+      - label: Other editable page copy
+        name: page_copy
+        widget: list
+        required: false
+        allow_add: false
+        allow_remove: false
+        allow_reorder: false
+        collapsed: true
+        summary: '{{fields.label}}'
+        fields: &current_copy_fields
+          - { label: Field key (leave unchanged), name: key, widget: hidden }
+          - { label: Where this appears, name: label, widget: string, required: true }
+          - { label: Page text, name: text, widget: text, required: true }
       - { label: Page image, name: hero_image, widget: image, required: false }
       - { label: Page image alt text, name: hero_image_alt, widget: string, required: false, hint: 'Required when an image is selected. Describe what is visible.' }
-    description: 'These are the 7 current service pages. Copy edits and optional page images are placed into the existing template. The shared site CSS and JavaScript load automatically; their source remains locked. Prices, booking/payment text, design controls, links, HTML, CSS and JavaScript editing are not available.'
+    description: 'These are the 7 current service pages. SEO fields, page headings, copy paragraphs, safe FAQs and optional page images are editable in the existing template. The shared site CSS and JavaScript load automatically; their source remains locked. Pricing tables, payment/rate FAQs, booking controls, links, design controls, HTML, CSS and JavaScript editing are not available.'
 
   - name: current_industries
     label: Current industry pages
@@ -56,18 +69,19 @@ collections:
       - { label: Meta description, name: description, widget: text, required: true, hint: 'Keep the existing page description accurate and concise.' }
       - { label: Main heading (H1), name: heading, widget: string, required: true }
       - { label: Introductory copy, name: intro, widget: text, required: true }
-      - label: Existing editorial sections
-        name: sections
+      - label: Other editable page copy
+        name: page_copy
         widget: list
-        min: 3
-        max: 3
-        summary: '{{fields.heading}}'
-        fields:
-          - { label: Section heading, name: heading, widget: string, required: true }
-          - { label: Section copy, name: body, widget: text, required: true }
+        required: false
+        allow_add: false
+        allow_remove: false
+        allow_reorder: false
+        collapsed: true
+        summary: '{{fields.label}}'
+        fields: *current_copy_fields
       - { label: Page image, name: hero_image, widget: image, required: false }
       - { label: Page image alt text, name: hero_image_alt, widget: string, required: false, hint: 'Required when an image is selected. Describe what is visible.' }
-    description: 'These are the 15 current industry pages. Copy edits and optional page images are placed into the existing template. Shared site CSS and JavaScript load automatically; their source remains locked. Service cards, prices, booking/payment content, design controls, links, HTML, CSS and JavaScript editing are not available.'
+    description: 'These are the 15 current industry pages. The complete existing editorial copy is listed by page location, including service information, FAQs and plain-text lists. Shared site CSS and JavaScript load automatically; their source remains locked. Pricing, booking/payment controls, links, design controls, HTML, CSS and JavaScript editing are not available.'
 
   - name: current_areas
     label: Current areas overview
@@ -84,6 +98,16 @@ collections:
       - { label: Meta description, name: description, widget: text, required: true, hint: 'Keep the existing page description accurate and concise.' }
       - { label: Main heading (H1), name: heading, widget: string, required: true }
       - { label: Introductory copy, name: intro, widget: text, required: true }
+      - label: Other editable page copy
+        name: page_copy
+        widget: list
+        required: false
+        allow_add: false
+        allow_remove: false
+        allow_reorder: false
+        collapsed: true
+        summary: '{{fields.label}}'
+        fields: *current_copy_fields
       - { label: Page image, name: hero_image, widget: image, required: false }
       - { label: Page image alt text, name: hero_image_alt, widget: string, required: false, hint: 'Required when an image is selected. Describe what is visible.' }
     description: 'This is the current consolidated London and South East coverage page. The old individual location pages are retired and redirect here. Optional images use the shared page template. Postcode lists, rates, travel details, design controls, links, HTML, CSS and JavaScript editing are locked.'

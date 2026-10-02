@@ -3,6 +3,7 @@ import path from 'node:path';
 import matter from 'gray-matter';
 import MarkdownIt from 'markdown-it';
 import { load } from 'cheerio';
+import { applyCurrentCopyFields } from './current-copy-fields.mjs';
 
 const root = process.cwd();
 const sourceRoot = path.join(root, 'content', 'cms');
@@ -82,6 +83,36 @@ function setMeta($, selector, attribute, value) {
   element.attr(attribute, value);
 }
 
+function syncVisibleFaqSchema($, file) {
+  const buttons = $('[data-testid^="button-faq-"]').toArray();
+  if (!buttons.length) return;
+  const questions = buttons.map((button) => {
+    const answerId = $(button).attr('aria-controls');
+    const answer = $('[id]').filter((_, element) => $(element).attr('id') === answerId).first();
+    if (!answer.length) fail(file, `FAQ question ${$(button).text().trim()} has no visible answer region.`);
+    return {
+      name: $(button).text().trim().replace(/\s+/gu, ' '),
+      text: answer.text().trim().replace(/\s+/gu, ' '),
+    };
+  });
+  for (const script of $('script[type="application/ld+json"]').toArray()) {
+    let data;
+    try { data = JSON.parse($(script).text()); }
+    catch { continue; }
+    const entities = Array.isArray(data['@graph']) ? data['@graph'] : [data];
+    for (const entity of entities.filter((item) => item?.['@type'] === 'FAQPage')) {
+      if (!Array.isArray(entity.mainEntity) || entity.mainEntity.length !== questions.length) {
+        fail(file, 'FAQ structured data no longer matches the visible FAQ list.');
+      }
+      entity.mainEntity.forEach((item, index) => {
+        item.name = questions[index].name;
+        item.acceptedAnswer = { ...(item.acceptedAnswer ?? {}), '@type': 'Answer', text: questions[index].text };
+      });
+    }
+    $(script).text(JSON.stringify(data).replace(/</gu, '\\u003c'));
+  }
+}
+
 async function renderExistingPage(type, data, file) {
   const slug = path.basename(file, '.md');
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(slug)) fail(file, 'Existing page filename must use a safe lowercase slug.');
@@ -113,20 +144,10 @@ async function renderExistingPage(type, data, file) {
     const summaryParagraph = $('main h2').first().closest('section').find('p').first();
     if (!summaryParagraph.length) fail(file, 'The service page does not have the expected overview paragraph.');
     summaryParagraph.text(summary);
-  } else if (type === 'industries' && slug !== 'overview') {
-    if (!Array.isArray(data.sections) || data.sections.length !== 3) fail(file, 'Keep the three existing editorial sections for this industry page.');
-    const headings = $('main h2').toArray().slice(0, 3);
-    if (headings.length !== 3) fail(file, 'The industry template no longer has its three editable editorial sections.');
-    data.sections.forEach((section, index) => {
-      const sectionHeading = validateExistingCopy(section?.heading, `Section ${index + 1} heading`, file, { max: 100 });
-      const sectionBody = validateExistingCopy(section?.body, `Section ${index + 1} copy`, file, { min: 60, max: 3000 });
-      const headingNode = $(headings[index]);
-      const paragraph = headingNode.closest('section').find('p').first();
-      if (!paragraph.length) fail(file, `Industry section ${index + 1} has no editable copy paragraph.`);
-      headingNode.text(sectionHeading);
-      paragraph.text(sectionBody);
-    });
   }
+
+  applyCurrentCopyFields($, type, slug, data.page_copy, path.relative(root, file), validateExistingCopy);
+  syncVisibleFaqSchema($, file);
 
   const imageHtml = await renderPageImage(data, file);
   if (imageHtml) {
