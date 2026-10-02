@@ -22,10 +22,10 @@ jobs:
               pull_number: context.issue.number,
               per_page: 100,
             });
-            const allowed = /^(?:content\/cms\/(?:services|industries|areas)\/[^/]+\.md|assets\/cms\/[A-Za-z0-9._/-]+\.(?:png|jpe?g|webp|avif|gif))$/i;
+            const allowed = /^(?:content\/cms\/(?:current\/(?:services|industries|areas)|services|industries|areas)\/[^/]+\.md|assets\/cms\/[A-Za-z0-9._/-]+\.(?:png|jpe?g|webp|avif|gif))$/i;
             const rejected = files.map(file => file.filename).filter(name => !allowed.test(name));
             if (rejected.length) {
-              core.setFailed(`This repo accepts agency edits only under content/cms/ and image uploads under assets/cms/. Rejected: ${rejected.join(', ')}`);
+              core.setFailed(`This repo accepts agency edits only to CMS Markdown under content/cms/ and image uploads under assets/cms/. Website HTML, CSS, JavaScript, payment, email, API and server files remain protected. Rejected: ${rejected.join(', ')}`);
             } else if (files.length === 0) {
               core.setFailed('The pull request contains no CMS content or image changes.');
             } else {

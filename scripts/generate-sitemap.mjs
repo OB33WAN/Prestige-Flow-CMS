@@ -27,6 +27,10 @@ function formatDate(input) {
 
 function routeFromIndex(root, filePath) {
   const relative = toPosixPath(path.relative(root, filePath));
+  const cmsOverview = relative.match(/^\.cms-generated-pages\/(services|industries|areas)\/index\.html$/u);
+  if (cmsOverview) return `/${cmsOverview[1]}`;
+  const cmsRoute = relative.match(/^\.cms-generated-pages\/(services|industries|areas)\/([a-z0-9]+(?:-[a-z0-9]+)*)\/index\.html$/u);
+  if (cmsRoute) return `/${cmsRoute[1]}/${cmsRoute[2]}`;
   const route = relative.replace(/\/index\.html$/u, '').replace(/index\.html$/u, '');
 
   if (!route || route === '') {

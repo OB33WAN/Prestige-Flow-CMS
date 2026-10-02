@@ -9,7 +9,7 @@ const indexable = new Set([...sitemap.matchAll(/<loc>(.*?)<\/loc>/gu)].map((matc
 const redirects = [];
 
 function routeFor(file) {
-  const relative = path.relative(root, file).split(path.sep).join('/');
+  const relative = path.relative(root, file).split(path.sep).join('/').replace(/^\.cms-generated-pages\//u, '');
   const route = relative.replace(/(?:^|\/)index\.html$/u, '');
   return route ? `/${route}/` : '/';
 }

@@ -3,6 +3,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { load } from 'cheerio';
+import matter from 'gray-matter';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = path.join(root, 'content', 'cms', 'services', '.cms-ci-test.md');
@@ -35,6 +37,35 @@ const fields = [
 ].join('\n');
 
 try {
+  execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' });
+  const currentServicePath = path.join(root, '.cms-generated-pages', 'services', 'drainage', 'index.html');
+  const currentIndustryPath = path.join(root, '.cms-generated-pages', 'industries', 'healthcare', 'index.html');
+  const currentAreasPath = path.join(root, '.cms-generated-pages', 'areas', 'index.html');
+  const sourceService = load(await fs.readFile(path.join(root, 'services', 'drainage', 'index.html'), 'utf8'));
+  const builtService = load(await fs.readFile(currentServicePath, 'utf8'));
+  const sourceIndustry = load(await fs.readFile(path.join(root, 'industries', 'healthcare', 'index.html'), 'utf8'));
+  const builtIndustry = load(await fs.readFile(currentIndustryPath, 'utf8'));
+  const sourceAreas = load(await fs.readFile(path.join(root, 'areas', 'index.html'), 'utf8'));
+  const builtAreas = load(await fs.readFile(currentAreasPath, 'utf8'));
+  assert.equal(builtService('main h1').text(), sourceService('main h1').text(), 'Current service pages are prefilled with existing copy.');
+  assert.equal(builtIndustry('main h1').text(), sourceIndustry('main h1').text(), 'Current industry pages are prefilled with existing copy.');
+  assert.equal(builtAreas('main h1').text(), sourceAreas('main h1').text(), 'The consolidated current areas page is prefilled.');
+  assert.deepEqual(builtService('script[src]').map((_, element) => builtService(element).attr('src')).get(), sourceService('script[src]').map((_, element) => sourceService(element).attr('src')).get(), 'Existing page JavaScript references stay unchanged.');
+  assert.deepEqual(builtService('link[rel="stylesheet"]').map((_, element) => builtService(element).attr('href')).get(), sourceService('link[rel="stylesheet"]').map((_, element) => sourceService(element).attr('href')).get(), 'Existing page stylesheets stay unchanged.');
+  assert.equal(builtAreas('details').length, sourceAreas('details').length, 'Existing postcode groups remain unchanged.');
+  assert.match(builtService('main').text(), /£120\s*\/\s*hour\s*\+\s*VAT|£120\/hr\s*\+\s*VAT/u, 'Existing service pricing stays in its owner-managed page section.');
+
+  const currentServiceFile = path.join(root, 'content', 'cms', 'current', 'services', 'drainage.md');
+  const originalServiceRecord = await fs.readFile(currentServiceFile, 'utf8');
+  const invalidServiceRecord = matter(originalServiceRecord);
+  invalidServiceRecord.data.service_summary = '£120/hr + VAT ' + invalidServiceRecord.data.service_summary;
+  await fs.writeFile(currentServiceFile, matter.stringify(invalidServiceRecord.content, invalidServiceRecord.data), 'utf8');
+  let rejectedExistingPrice = false;
+  try { execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' }); }
+  catch (error) { rejectedExistingPrice = /pricing, payment or technical content controlled by the site owner/u.test(String(error.stderr)); }
+  finally { await fs.writeFile(currentServiceFile, originalServiceRecord, 'utf8'); }
+  assert.ok(rejectedExistingPrice, 'Existing-page copy edits must reject attempts to change owner-managed prices.');
+
   await fs.writeFile(source, fields, 'utf8');
   execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' });
   const html = await fs.readFile(generated, 'utf8');
@@ -61,7 +92,7 @@ try {
   try { execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' }); }
   catch (error) { rejected = /Email addresses and email links are centrally managed/u.test(String(error.stderr)); }
   assert.ok(rejected, 'Build must reject new email addresses in CMS copy.');
-  console.log('PASS: CMS page generation, SEO metadata, internal links, safe Markdown and pricing controls.');
+  console.log('PASS: Current page inventory, text-only page overlays, protected styles/scripts/pricing, new page generation, SEO metadata and safe copy.');
 } finally {
   await fs.rm(source, { force: true });
   execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' });

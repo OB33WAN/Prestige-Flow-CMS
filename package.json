@@ -14,6 +14,7 @@
     "stripe:import": "node scripts/import-stripe-products.mjs --file data/stripe-products.csv",
     "stripe:import:dry": "node scripts/import-stripe-products.mjs --file data/stripe-products.csv --dry-run",
     "cms:build": "node scripts/build-cms-pages.mjs",
+    "cms:import-current": "node scripts/import-current-cms-pages.mjs",
     "test:cms": "node scripts/test-cms-pages.mjs",
     "build": "node scripts/build-cms-pages.mjs && node scripts/generate-sitemap.mjs && node scripts/generate-nginx-redirects.mjs && node scripts/build.mjs",
     "check": "node scripts/check-site.mjs && npm run links:audit",

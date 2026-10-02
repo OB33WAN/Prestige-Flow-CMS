@@ -2,9 +2,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
 import MarkdownIt from 'markdown-it';
+import { load } from 'cheerio';
 
 const root = process.cwd();
 const sourceRoot = path.join(root, 'content', 'cms');
+const existingRoot = path.join(sourceRoot, 'current');
 const outputRoot = path.join(root, '.cms-generated-pages');
 const pageTypes = ['services', 'industries', 'areas'];
 const siteOrigin = 'https://prestigeflow.co.uk';
@@ -43,6 +45,75 @@ function validateString(value, label, file, { min = 1, max = 2000 } = {}) {
   if (typeof value !== 'string' || value.trim().length < min || value.trim().length > max) fail(file, `${label} must be ${min}–${max} characters.`);
   if (/lorem ipsum|placeholder|coming soon|insert (text|copy)|your (service|business|city) here|test page/iu.test(value)) fail(file, `${label} contains placeholder wording.`);
   return value.trim();
+}
+
+function validateExistingCopy(value, label, file, { min = 1, max = 2000 } = {}) {
+  const text = validateString(value, label, file, { min, max });
+  if (/£\s*\d|\bGBP\s*\d|\b\d+(?:\.\d+)?\s*(?:plus\s+VAT|per\s+(?:hour|hr)|\/(?:hour|hr))|\b\d+%\s+deposit|\b(?:Stripe|checkout|webhook|API)\b/iu.test(text)) {
+    fail(file, `${label} contains pricing, payment or technical content controlled by the site owner.`);
+  }
+  if (/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/iu.test(text)) fail(file, `${label} must not contain an email address.`);
+  return text;
+}
+
+function setMeta($, selector, attribute, value) {
+  let element = $(selector).first();
+  if (!element.length) {
+    const match = selector.match(/^meta\[(name|property)="([^"]+)"\]$/u);
+    if (!match) throw new Error(`Unsupported metadata selector: ${selector}`);
+    element = $('<meta>').attr(match[1], match[2]).appendTo('head');
+  }
+  element.attr(attribute, value);
+}
+
+async function renderExistingPage(type, data, file) {
+  const slug = path.basename(file, '.md');
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(slug)) fail(file, 'Existing page filename must use a safe lowercase slug.');
+  const sourceFile = path.join(root, type, slug === 'overview' ? 'index.html' : path.join(slug, 'index.html'));
+  let source;
+  try { source = await fs.readFile(sourceFile, 'utf8'); }
+  catch (error) { if (error.code === 'ENOENT') fail(file, `No existing ${type} page matches /${type}/${slug}/.`); throw error; }
+  const $ = load(source);
+  if ($('meta[http-equiv="refresh"]').length || /noindex/i.test($('meta[name="robots"]').attr('content') ?? '')) {
+    fail(file, 'This page is retired or noindex and cannot be edited as a current page.');
+  }
+  const title = validateExistingCopy(data.title, 'SEO title', file, { max: 60 });
+  const description = validateExistingCopy(data.description, 'Meta description', file, { min: 70, max: 180 });
+  const heading = validateExistingCopy(data.heading, 'Page heading', file, { max: 100 });
+  const intro = validateExistingCopy(data.intro, 'Introductory copy', file, { min: 40, max: 900 });
+  const h1 = $('main h1').first();
+  if (!h1.length || !h1.next('p').length) fail(file, 'The existing page template does not have the expected heading and introduction.');
+
+  $('title').first().text(title);
+  setMeta($, 'meta[name="description"]', 'content', description);
+  setMeta($, 'meta[property="og:title"]', 'content', title);
+  setMeta($, 'meta[property="og:description"]', 'content', description);
+  setMeta($, 'meta[name="twitter:title"]', 'content', title);
+  setMeta($, 'meta[name="twitter:description"]', 'content', description);
+  h1.text(heading);
+  h1.next('p').text(intro);
+
+  if (type === 'services' && slug !== 'overview') {
+    const summary = validateExistingCopy(data.service_summary, 'Service summary', file, { min: 60, max: 1000 });
+    const summaryParagraph = $('main h2').first().closest('section').find('p').first();
+    if (!summaryParagraph.length) fail(file, 'The service page does not have the expected overview paragraph.');
+    summaryParagraph.text(summary);
+  } else if (type === 'industries' && slug !== 'overview') {
+    if (!Array.isArray(data.sections) || data.sections.length !== 3) fail(file, 'Keep the three existing editorial sections for this industry page.');
+    const headings = $('main h2').toArray().slice(0, 3);
+    if (headings.length !== 3) fail(file, 'The industry template no longer has its three editable editorial sections.');
+    data.sections.forEach((section, index) => {
+      const sectionHeading = validateExistingCopy(section?.heading, `Section ${index + 1} heading`, file, { max: 100 });
+      const sectionBody = validateExistingCopy(section?.body, `Section ${index + 1} copy`, file, { min: 60, max: 3000 });
+      const headingNode = $(headings[index]);
+      const paragraph = headingNode.closest('section').find('p').first();
+      if (!paragraph.length) fail(file, `Industry section ${index + 1} has no editable copy paragraph.`);
+      headingNode.text(sectionHeading);
+      paragraph.text(sectionBody);
+    });
+  }
+
+  return { route: slug === 'overview' ? `/${type}/` : `/${type}/${slug}/`, html: $.html() };
 }
 
 async function renderPage(type, data, file) {
@@ -130,6 +201,20 @@ async function main() {
   await fs.rm(outputRoot, { recursive: true, force: true });
   const allFiles = (await Promise.all(pageTypes.map((type) => listMarkdown(path.join(sourceRoot, type))))).flat();
   const routes = new Set();
+  for (const type of ['services', 'industries', 'areas']) {
+    const currentFiles = await listMarkdown(path.join(existingRoot, type));
+    for (const file of currentFiles) {
+      const page = await renderExistingPage(type, matter(await fs.readFile(file, 'utf8')).data, file);
+      if (routes.has(page.route)) fail(file, `Duplicate CMS URL: ${page.route}`);
+      routes.add(page.route);
+      const slug = path.basename(file, '.md');
+      const output = slug === 'overview'
+        ? path.join(outputRoot, type, 'index.html')
+        : path.join(outputRoot, type, slug, 'index.html');
+      await fs.mkdir(path.dirname(output), { recursive: true });
+      await fs.writeFile(output, page.html, 'utf8');
+    }
+  }
   for (const file of allFiles) {
     const relative = path.relative(sourceRoot, file).split(path.sep).join('/');
     const [type] = relative.split('/');
