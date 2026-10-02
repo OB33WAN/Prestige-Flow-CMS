@@ -10,38 +10,5 @@ Disallow: /admin-login
 Disallow: /api/admin
 Disallow: /api/auth
 
-# Public machine-readable resources
-Allow: /llms.txt
-Allow: /ai.txt
-Allow: /local-business-schema.jsonld
-
-# Explicitly allow major AI/answer-engine crawlers
-User-agent: GPTBot
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: Claude-Web
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: CCBot
-Allow: /
-
-User-agent: Applebot-Extended
-Allow: /
-
-User-agent: FacebookBot
-Allow: /
-
 # Crawl discovery
 Sitemap: https://prestigeflow.co.uk/sitemap.xml

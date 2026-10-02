@@ -84,19 +84,4 @@ for (const file of htmlFiles) {
   }
 }
 
-const aiPath = path.join(root, 'ai.txt');
-let ai = await fs.readFile(aiPath, 'utf8');
-ai = ai.replace(/- Drainage, emergency drainage and blocked toilets:.*\n- London plumbing:.*\n- Other-region plumbing:.*\n- CCTV survey:.*/, [
-  '- Drainage, emergency drainage and blocked toilets: £120/hr + VAT, Monday–Friday 8am–6pm; £140/hr + VAT evenings and weekends.',
-  '- Plumbing: £105/hr + VAT, Monday–Friday 8am–6pm; £115/hr + VAT evenings and weekends.',
-  '- CCTV survey: £175 + VAT fixed price, Monday to Sunday.',
-  '- Rates are the same across covered areas. Beyond the M25, a £75 call-out covers up to 100 miles outside the M25; longer journeys are adjusted accordingly.'
-].join('\n'));
-await fs.writeFile(aiPath, ai, 'utf8');
-
-const llmsPath = path.join(root, 'llms.txt');
-let llms = await fs.readFile(llmsPath, 'utf8');
-llms = llms.replace(/Scheduled bookings require a 10% deposit\..*?(?=\n|$)/, 'Online checkout is being connected to Stripe. Call 07743 565339 to arrange and confirm a booking until secure checkout is available. Emergency services are available 24/7. See the Services page for current rates and VAT details.');
-await fs.writeFile(llmsPath, llms, 'utf8');
-
 console.log(`Updated ${changed} HTML files; replaced ${tablesReplaced} embedded rate tables with the September 2026 unified schedule.`);
