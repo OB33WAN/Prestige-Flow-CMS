@@ -57,13 +57,41 @@ try {
 
   const currentServiceFile = path.join(root, 'content', 'cms', 'current', 'services', 'drainage.md');
   const originalServiceRecord = await fs.readFile(currentServiceFile, 'utf8');
-  const invalidServiceRecord = matter(originalServiceRecord);
+  const imagePath = path.join(root, 'assets', 'cms', 'cms-ci-test-image.jpg');
+  const imageRecordPath = path.join(root, 'content', 'cms', 'current', 'services', 'cms-image-test.md');
+  const imageSourcePath = path.join(root, 'services', 'cms-image-test', 'index.html');
+  await fs.mkdir(path.dirname(imagePath), { recursive: true });
+  await fs.mkdir(path.dirname(imageSourcePath), { recursive: true });
+  await fs.copyFile(path.join(root, 'assets', 'camera_inspection_in_881c5ae9-CpB7Vb8q.jpg'), imagePath);
+  try {
+    const imageRecord = matter(originalServiceRecord);
+    imageRecord.data.title = 'CMS image test | Prestige Flow';
+    imageRecord.data.description = 'Temporary image verification confirms that the Prestige Flow editor can publish uploaded page images correctly.';
+    imageRecord.data.heading = 'CMS image verification';
+    imageRecord.data.intro = 'This temporary page verifies that editors can upload and publish an image on a current service page.';
+    imageRecord.data.hero_image = '/assets/cms/cms-ci-test-image.jpg';
+    imageRecord.data.hero_image_alt = 'Engineer carrying out a drain camera inspection';
+    await fs.writeFile(imageRecordPath, matter.stringify(imageRecord.content, imageRecord.data), 'utf8');
+    await fs.copyFile(path.join(root, 'services', 'drainage', 'index.html'), imageSourcePath);
+    execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' });
+    const imagePage = load(await fs.readFile(path.join(root, '.cms-generated-pages', 'services', 'cms-image-test', 'index.html'), 'utf8'));
+    assert.equal(imagePage('.cms-editorial-image img').attr('src'), '/assets/cms/cms-ci-test-image.jpg', 'Uploaded images render on current pages.');
+    assert.equal(imagePage('.cms-editorial-image img').attr('alt'), 'Engineer carrying out a drain camera inspection', 'Uploaded images have meaningful alt text.');
+    assert.ok(imagePage('link[rel="stylesheet"][href="/assets/cms-pages.css"]').length, 'Current pages load the scoped image styles.');
+  } finally {
+    await fs.rm(imageRecordPath, { force: true });
+    await fs.rm(path.dirname(imageSourcePath), { recursive: true, force: true });
+    await fs.rm(imagePath, { force: true });
+    execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' });
+  }
+  const priceTestOriginal = await fs.readFile(currentServiceFile, 'utf8');
+  const invalidServiceRecord = matter(priceTestOriginal);
   invalidServiceRecord.data.service_summary = '£120/hr + VAT ' + invalidServiceRecord.data.service_summary;
   await fs.writeFile(currentServiceFile, matter.stringify(invalidServiceRecord.content, invalidServiceRecord.data), 'utf8');
   let rejectedExistingPrice = false;
   try { execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' }); }
   catch (error) { rejectedExistingPrice = /pricing, payment or technical content controlled by the site owner/u.test(String(error.stderr)); }
-  finally { await fs.writeFile(currentServiceFile, originalServiceRecord, 'utf8'); }
+  finally { await fs.writeFile(currentServiceFile, priceTestOriginal, 'utf8'); }
   assert.ok(rejectedExistingPrice, 'Existing-page copy edits must reject attempts to change owner-managed prices.');
 
   await fs.writeFile(source, fields, 'utf8');
@@ -73,6 +101,9 @@ try {
   assert.match(html, /<link rel="canonical" href="https:\/\/prestigeflow\.co\.uk\/services\/cms-ci-test\/">/u);
   assert.match(html, /<h1>Drainage advice in Maidenhead<\/h1>/u);
   assert.match(html, /href="\/services\/drainage\/"/u);
+  assert.ok(html.includes('href="/assets/styles.css"'), 'New CMS pages use the shared website stylesheet.');
+  assert.ok(html.includes('src="/assets/static-site.js"'), 'New CMS pages use the shared website interactions.');
+  assert.ok(html.includes('src="/assets/site-config.js"'), 'New CMS pages load the shared site configuration.');
   assert.doesNotMatch(html, /<script>window\.cmsXss/u, 'Raw editor HTML must not be emitted as executable markup.');
 
   await fs.writeFile(source, fields.replace(paragraph, `£120/hr ${paragraph}`), 'utf8');
@@ -92,7 +123,7 @@ try {
   try { execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' }); }
   catch (error) { rejected = /Email addresses and email links are centrally managed/u.test(String(error.stderr)); }
   assert.ok(rejected, 'Build must reject new email addresses in CMS copy.');
-  console.log('PASS: Current page inventory, text-only page overlays, protected styles/scripts/pricing, new page generation, SEO metadata and safe copy.');
+  console.log('PASS: Current page inventory, text/image overlays, shared styles/scripts, protected code/pricing, new page generation, SEO metadata and safe copy.');
 } finally {
   await fs.rm(source, { force: true });
   execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' });

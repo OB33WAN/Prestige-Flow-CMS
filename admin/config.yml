@@ -36,7 +36,9 @@ collections:
       - { label: Main heading (H1), name: heading, widget: string, required: true }
       - { label: Introductory copy, name: intro, widget: text, required: true }
       - { label: Service overview copy, name: service_summary, widget: text, required: true }
-    description: 'These are the 7 current service pages. Copy edits update only approved text in the existing page template. Prices, pricing headings, booking/payment text, design, links, HTML, CSS and JavaScript are locked.'
+      - { label: Page image, name: hero_image, widget: image, required: false }
+      - { label: Page image alt text, name: hero_image_alt, widget: string, required: false, hint: 'Required when an image is selected. Describe what is visible.' }
+    description: 'These are the 7 current service pages. Copy edits and optional page images are placed into the existing template. The shared site CSS and JavaScript load automatically; their source remains locked. Prices, booking/payment text, design controls, links, HTML, CSS and JavaScript editing are not available.'
 
   - name: current_industries
     label: Current industry pages
@@ -61,7 +63,9 @@ collections:
         fields:
           - { label: Section heading, name: heading, widget: string, required: true }
           - { label: Section copy, name: body, widget: text, required: true }
-    description: 'These are the 15 current industry pages. Copy edits update selected text in the existing page template. Service cards, prices, booking/payment content, design, links, HTML, CSS and JavaScript remain locked.'
+      - { label: Page image, name: hero_image, widget: image, required: false }
+      - { label: Page image alt text, name: hero_image_alt, widget: string, required: false, hint: 'Required when an image is selected. Describe what is visible.' }
+    description: 'These are the 15 current industry pages. Copy edits and optional page images are placed into the existing template. Shared site CSS and JavaScript load automatically; their source remains locked. Service cards, prices, booking/payment content, design controls, links, HTML, CSS and JavaScript editing are not available.'
 
   - name: current_areas
     label: Current areas overview
@@ -77,7 +81,9 @@ collections:
       - { label: Meta description, name: description, widget: text, required: true, hint: 'Keep the existing page description accurate and concise.' }
       - { label: Main heading (H1), name: heading, widget: string, required: true }
       - { label: Introductory copy, name: intro, widget: text, required: true }
-    description: 'This is the current consolidated London and South East coverage page. The old individual location pages are retired and redirect here. Postcode lists, rates, travel details, design, links, HTML, CSS and JavaScript are locked.'
+      - { label: Page image, name: hero_image, widget: image, required: false }
+      - { label: Page image alt text, name: hero_image_alt, widget: string, required: false, hint: 'Required when an image is selected. Describe what is visible.' }
+    description: 'This is the current consolidated London and South East coverage page. The old individual location pages are retired and redirect here. Optional images use the shared page template. Postcode lists, rates, travel details, design controls, links, HTML, CSS and JavaScript editing are locked.'
 
   - name: services
     label: New service page drafts

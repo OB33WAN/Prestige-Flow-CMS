@@ -56,6 +56,22 @@ function validateExistingCopy(value, label, file, { min = 1, max = 2000 } = {}) 
   return text;
 }
 
+async function renderPageImage(data, file) {
+  const heroImage = String(data.hero_image ?? '').trim();
+  const heroAlt = String(data.hero_image_alt ?? '').trim();
+  if (!heroImage) {
+    if (heroAlt) fail(file, 'Image alt text is set but no image is selected.');
+    return '';
+  }
+  if (!/^\/assets\/cms\/[A-Za-z0-9._/-]+\.(?:png|jpe?g|webp|avif|gif)$/iu.test(heroImage) || heroImage.includes('..')) {
+    fail(file, 'Uploaded images must be stored in the CMS media folder.');
+  }
+  if (!heroAlt || heroAlt.length > 180) fail(file, 'Provide useful image alt text (up to 180 characters).');
+  const imagePath = path.join(root, heroImage.replace(/^\//u, ''));
+  try { await fs.access(imagePath); } catch { fail(file, `Image does not exist: ${heroImage}`); }
+  return `<figure class="cms-editorial-image"><img class="cms-page-hero-image" src="${escape(heroImage)}" alt="${escape(heroAlt)}" width="1200" height="750" loading="eager"></figure>`;
+}
+
 function setMeta($, selector, attribute, value) {
   let element = $(selector).first();
   if (!element.length) {
@@ -92,7 +108,6 @@ async function renderExistingPage(type, data, file) {
   setMeta($, 'meta[name="twitter:description"]', 'content', description);
   h1.text(heading);
   h1.next('p').text(intro);
-
   if (type === 'services' && slug !== 'overview') {
     const summary = validateExistingCopy(data.service_summary, 'Service summary', file, { min: 60, max: 1000 });
     const summaryParagraph = $('main h2').first().closest('section').find('p').first();
@@ -111,6 +126,14 @@ async function renderExistingPage(type, data, file) {
       headingNode.text(sectionHeading);
       paragraph.text(sectionBody);
     });
+  }
+
+  const imageHtml = await renderPageImage(data, file);
+  if (imageHtml) {
+    const introParagraph = h1.next('p');
+    if (!introParagraph.length) fail(file, 'The existing page has no introduction element for the image placement.');
+    introParagraph.after(imageHtml);
+    if (!$('link[rel="stylesheet"][href="/assets/cms-pages.css"]').length) $('head').append('<link rel="stylesheet" href="/assets/cms-pages.css">');
   }
 
   return { route: slug === 'overview' ? `/${type}/` : `/${type}/${slug}/`, html: $.html() };
@@ -139,16 +162,7 @@ async function renderPage(type, data, file) {
     fail(file, 'Email addresses and email links are centrally managed; remove them from this page.');
   }
 
-  const heroImage = String(data.hero_image ?? '').trim();
-  const heroAlt = String(data.hero_image_alt ?? '').trim();
-  let imageHtml = '';
-  if (heroImage) {
-    if (!heroImage.startsWith('/assets/cms/') || heroImage.includes('..')) fail(file, 'Uploaded images must be stored in the CMS media folder.');
-    if (!heroAlt || heroAlt.length > 180) fail(file, 'Provide useful image alt text (up to 180 characters).');
-    const imagePath = path.join(root, heroImage.replace(/^\//u, ''));
-    try { await fs.access(imagePath); } catch { fail(file, `Hero image does not exist: ${heroImage}`); }
-    imageHtml = `<img class="cms-page-hero-image" src="${escape(heroImage)}" alt="${escape(heroAlt)}" width="1200" height="675" loading="eager">`;
-  } else if (heroAlt) fail(file, 'Image alt text is set but no hero image is selected.');
+  const imageHtml = await renderPageImage(data, file);
 
   let linksHtml = '';
   if (data.internal_links != null) {
@@ -177,7 +191,7 @@ async function renderPage(type, data, file) {
   <meta property="og:description" content="${escape(description)}"><meta property="og:image" content="${siteOrigin}/share-image.jpg">
   <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escape(title)}">
   <meta name="twitter:description" content="${escape(description)}">
-  <link rel="icon" href="/favicon.jpg" type="image/jpeg"><link rel="stylesheet" href="/assets/static-site.css"><link rel="stylesheet" href="/assets/cms-pages.css">
+  <link rel="icon" href="/favicon.jpg" type="image/jpeg"><link rel="stylesheet" href="/assets/styles.css"><link rel="stylesheet" href="/assets/static-site.css"><link rel="stylesheet" href="/assets/cms-pages.css">
   <script type="application/ld+json">${businessSchema}</script>
 </head><body class="cms-page">
   <a class="cms-skip-link" href="#main-content">Skip to content</a>
@@ -192,6 +206,7 @@ async function renderPage(type, data, file) {
     <section class="cms-contact"><h2>Need help with ${escape(heading.toLowerCase())}?</h2><p>Speak with Prestige Flow about your site, symptoms or service requirements.</p><a class="cms-button cms-button-primary" href="tel:+447743565339">Call 07743 565339</a></section>
   </main>
   <footer class="cms-footer"><p><strong>Prestige Flow LTD</strong> · Drainage, plumbing and CCTV services across London and the South East.</p><p><a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a> · <a href="/contact/">Contact</a></p></footer>
+  <script src="/assets/site-config.js" defer></script><script src="/assets/static-site.js" defer></script>
 </body></html>` };
 }
 
