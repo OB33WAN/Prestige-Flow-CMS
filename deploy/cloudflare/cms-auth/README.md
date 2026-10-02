@@ -1,6 +1,6 @@
 # Prestige Flow Decap CMS authentication Worker
 
-This Cloudflare Worker handles Decap CMS GitHub OAuth for `OB33WAN/Prestige-Flow`. It must be deployed separately from the static website.
+This Cloudflare Worker handles Decap CMS GitHub OAuth for `OB33WAN/Prestige-Flow-CMS`. It is deployed separately from the static website.
 
 ## Before deploying
 
@@ -20,4 +20,4 @@ npm run deploy
 
 The Worker uses a short-lived, HttpOnly, Secure, SameSite=Lax state cookie and rejects callback requests whose OAuth `state` does not match. It returns the GitHub token only to the configured Prestige Flow CMS origins. Add any future CMS origin to `allowedCmsOrigins` in `src/index.ts` before using it.
 
-The source repository is `OB33WAN/Prestige-Flow` (`main`). Deploy the website CMS configuration only after the Worker hostname is serving HTTPS.
+The source repository is `OB33WAN/Prestige-Flow-CMS` (`main`). The CMS editor is served at `/admin/` on the website host; that path must be present in the current website deployment before editors can open it. Deploy the website CMS configuration only after the Worker hostname is serving HTTPS.
