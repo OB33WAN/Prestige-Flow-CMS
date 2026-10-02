@@ -50,6 +50,8 @@ try {
   assert.match(snapshots.areas.overview, /£144\.00/u, 'Owner-controlled rate content remains visible in the page preview.');
   assert.match(cmsPreview, /dangerouslySetInnerHTML/u, 'Existing pages render their complete page markup in the side preview.');
   assert.match(cmsPreview, /id: 'root'/u, 'Existing page previews retain the site root styling context.');
+  assert.match(cmsPreview, /currentPagePreview\(entry, collectionName, this\.props\)/u, 'Existing page previews receive Decap image assets.');
+  assert.match(cmsPreview, /intro\.insertAdjacentElement\('afterend', figure\)/u, 'Uploaded images appear in current-page side previews.');
   assert.match(cmsPreview, /registerPreviewStyle\('\/admin\/preview\.css\?v=2'\)/u, 'CMS previews load responsive sizing and control styles.');
   assert.match(await fs.readFile(path.join(root, 'admin', 'preview.css'), 'utf8'), /min-width:\s*0\s*!important/u, 'Wide pricing tables can fit the responsive preview viewport.');
   assert.match(cmsConfig, /preview_path: 'services\/\{\{slug\}\}\//u, 'Service records map to their live page routes.');

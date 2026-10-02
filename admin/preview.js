@@ -21,21 +21,30 @@
     return result == null ? '' : result.toString();
   }
 
-  function imageFor(entry, props) {
+  function imageDetails(entry, props) {
     var image = value(entry, 'hero_image');
     var alt = value(entry, 'hero_image_alt');
     if (!image) return null;
     var source = typeof props.getAsset === 'function' ? props.getAsset(image) : image;
+    return {
+      source: source && source.toString ? source.toString() : String(source || image),
+      alt: alt
+    };
+  }
+
+  function imageFor(entry, props) {
+    var image = imageDetails(entry, props);
+    if (!image) return null;
     return elementFactory('img', {
       className: 'cms-page-hero-image',
-      src: source && source.toString ? source.toString() : String(source || image),
-      alt: alt,
+      src: image.source,
+      alt: image.alt,
       width: 1200,
       height: 750
     });
   }
 
-  function currentPagePreview(entry, collectionName) {
+  function currentPagePreview(entry, collectionName, props) {
     var snapshots = window.PRESTIGE_CMS_PAGE_SNAPSHOTS;
     var slug = entry && entry.get && entry.get('slug');
     if (!snapshots || !slug) return null;
@@ -51,6 +60,21 @@
     h1.textContent = value(entry, 'heading') || h1.textContent;
     var intro = h1.nextElementSibling;
     if (intro && intro.matches('p')) intro.textContent = value(entry, 'intro') || intro.textContent;
+
+    var selectedImage = imageDetails(entry, props);
+    if (intro && intro.matches('p') && selectedImage) {
+      var figure = parsed.createElement('figure');
+      var imageElement = parsed.createElement('img');
+      figure.className = 'cms-editorial-image';
+      imageElement.className = 'cms-page-hero-image';
+      imageElement.src = selectedImage.source;
+      imageElement.alt = selectedImage.alt;
+      imageElement.width = 1200;
+      imageElement.height = 750;
+      imageElement.loading = 'eager';
+      figure.appendChild(imageElement);
+      intro.insertAdjacentElement('afterend', figure);
+    }
 
     if (group === 'services' && slug !== 'overview') {
       var summaryHeading = parsed.querySelector('main h2');
@@ -98,7 +122,7 @@
     return classFactory({
       render: function () {
         var entry = this.props.entry;
-        var pageMarkup = currentPagePreview(entry, collectionName);
+        var pageMarkup = currentPagePreview(entry, collectionName, this.props);
         if (pageMarkup) {
           return elementFactory('div', {
             id: 'root',
