@@ -14,6 +14,7 @@
   CMS.registerPreviewStyle('/assets/styles.css');
   CMS.registerPreviewStyle('/assets/static-site.css');
   CMS.registerPreviewStyle('/assets/cms-pages.css');
+  CMS.registerPreviewStyle('/admin/preview.css?v=2');
 
   function value(entry, field) {
     var result = entry && entry.getIn(['data', field]);

@@ -1,0 +1,38 @@
+/* Keep the real page styles, but make wide elements behave inside Decap's narrow preview pane. */
+#root,
+#root main {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+#root {
+  overflow-x: clip;
+}
+
+#root table {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100%;
+  table-layout: fixed;
+}
+
+#root th,
+#root td {
+  min-width: 0;
+  padding-inline: .45rem;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
+
+#root a,
+#root button,
+#root summary {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+#root details > summary {
+  cursor: pointer;
+}
