@@ -1,0 +1,74 @@
+{
+  "@context": "https://schema.org",
+  "@type": "Plumber",
+  "@id": "https://prestigeflow.co.uk/#business",
+  "name": "Prestige Flow LTD",
+  "url": "https://prestigeflow.co.uk/",
+  "telephone": "+447743565339",
+  "email": "info@prestigeflow.co.uk",
+  "image": "https://prestigeflow.co.uk/logo.jpg",
+  "logo": "https://prestigeflow.co.uk/logo.jpg",
+  "identifier": {
+    "@type": "PropertyValue",
+    "propertyID": "Companies House company number",
+    "value": "12717009"
+  },
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "23a Kenilworth Gardens",
+    "addressLocality": "Hayes",
+    "addressRegion": "England",
+    "postalCode": "UB4 0AY",
+    "addressCountry": "GB"
+  },
+  "areaServed": [
+    "London",
+    "Reading",
+    "Maidenhead",
+    "Slough",
+    "Southeast England"
+  ],
+  "sameAs": [
+    "https://g.page/r/CWoooDggCsiQEBE",
+    "https://uk.trustpilot.com/review/prestigeflow.co.uk",
+    "https://www.facebook.com/profile.php?id=61562404768506",
+    "https://www.linkedin.com/company/prestige-flow-ltd",
+    "https://www.instagram.com/prestigeflowltd"
+  ],
+  "openingHoursSpecification": [
+    {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday"
+      ],
+      "opens": "08:00",
+      "closes": "18:00"
+    }
+  ],
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "telephone": "+447743565339",
+    "contactType": "24/7 emergency service",
+    "availableLanguage": "English",
+    "hoursAvailable": [
+      {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "opens": "00:00",
+        "closes": "23:59"
+      }
+    ]
+  }
+}
