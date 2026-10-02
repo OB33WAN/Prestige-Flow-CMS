@@ -39,6 +39,16 @@ const fields = [
 try {
   const cmsConfig = await fs.readFile(path.join(root, 'admin', 'config.yml'), 'utf8');
   const cmsPreview = await fs.readFile(path.join(root, 'admin', 'preview.js'), 'utf8');
+  execFileSync(process.execPath, ['scripts/generate-cms-preview-snapshots.mjs'], { cwd: root, stdio: 'pipe' });
+  const snapshotSource = await fs.readFile(path.join(root, 'admin', 'page-snapshots.js'), 'utf8');
+  const snapshotMatch = snapshotSource.match(/window\.PRESTIGE_CMS_PAGE_SNAPSHOTS = (.+);\s*$/u);
+  assert.ok(snapshotMatch, 'Full-page preview snapshots are generated for the CMS.');
+  const snapshots = JSON.parse(snapshotMatch[1]);
+  assert.equal(Object.keys(snapshots.services).length, 8, 'The service overview and all 7 current service pages are available in the side preview.');
+  assert.equal(Object.keys(snapshots.industries).length, 16, 'The industry overview and all 15 current industry pages are available in the side preview.');
+  assert.match(snapshots.areas.overview, /postcode coverage/iu, 'The Areas preview retains its complete coverage content.');
+  assert.match(snapshots.areas.overview, /£144\.00/u, 'Owner-controlled rate content remains visible in the page preview.');
+  assert.match(cmsPreview, /dangerouslySetInnerHTML/u, 'Existing pages render their complete page markup in the side preview.');
   assert.match(cmsConfig, /preview_path: 'services\/\{\{slug\}\}\//u, 'Service records map to their live page routes.');
   assert.match(cmsConfig, /preview_path: 'industries\/\{\{slug\}\}\//u, 'Industry records map to their live page routes.');
   assert.match(cmsConfig, /preview_path: 'areas\/'/u, 'The current Areas overview links to /areas/.');
