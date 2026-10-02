@@ -37,6 +37,17 @@ const fields = [
 ].join('\n');
 
 try {
+  const cmsConfig = await fs.readFile(path.join(root, 'admin', 'config.yml'), 'utf8');
+  const cmsPreview = await fs.readFile(path.join(root, 'admin', 'preview.js'), 'utf8');
+  assert.match(cmsConfig, /preview_path: 'services\/\{\{slug\}\}\//u, 'Service records map to their live page routes.');
+  assert.match(cmsConfig, /preview_path: 'industries\/\{\{slug\}\}\//u, 'Industry records map to their live page routes.');
+  assert.match(cmsConfig, /preview_path: 'areas\/'/u, 'The current Areas overview links to /areas/.');
+  for (const collection of ['current_services', 'current_industries', 'current_areas', 'services', 'industries', 'areas']) {
+    assert.ok(cmsPreview.includes("registerPreviewTemplate('" + collection + "'"), `CMS has a branded preview for ${collection}.`);
+  }
+  assert.ok(cmsPreview.includes("registerPreviewStyle('/assets/cms-pages.css')"), 'CMS previews load the site page styling.');
+  execFileSync(process.execPath, ['--check', 'admin/preview.js'], { cwd: root, stdio: 'pipe' });
+
   execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' });
   const currentServicePath = path.join(root, '.cms-generated-pages', 'services', 'drainage', 'index.html');
   const currentIndustryPath = path.join(root, '.cms-generated-pages', 'industries', 'healthcare', 'index.html');
