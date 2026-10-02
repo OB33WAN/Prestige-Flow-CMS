@@ -2,17 +2,17 @@
 
 ## What the CMS does
 
-The CMS is a password-protected editing screen for drafting new service, industry and area pages. Editors enter page copy and SEO fields in a web form; Decap saves a draft in GitHub and opens a pull request for review. It does not let an outside editor publish directly. The public website stays on its existing Octopye/EasyPanel Upload deployment and does not update automatically when a pull request is merged.
+The CMS is an editing screen for drafting new service, industry and area pages. Editors enter page copy and SEO fields in a web form; Decap saves a draft in GitHub and opens a pull request for review. Only after you approve and merge that pull request to protected `main` does EasyPanel automatically build and deploy the approved content to staging. The apex/live domain is not attached to this service.
 
 The CMS is currently for **new** SEO landing pages. The existing hand-built pages are not editable from this screen. Prices, payment terms, canonical rules, redirects and structured data stay centrally managed and are checked by the build.
 
 ## The link to send editors
 
-After the latest website build has been uploaded to the website service, editors will use:
+Editors will use:
 
-`https://prestigeflow.co.uk/admin/`
+`https://staging.prestigeflow.co.uk/admin/`
 
-For a staging check, use `https://staging.prestigeflow.co.uk/admin/` if that staging domain is attached to the current website service. At present, both `/admin/` paths return 404, so the editor is **not yet live** and this link is not ready to send. The local build includes the editor under `.public-site/admin/`; the production or staging website needs that build uploaded through Octopye/EasyPanel first.
+The EasyPanel `old-web` service currently serves this hostname. Configure the service's source as the public GitHub repository and deploy the first build; after that, merges to `main` trigger staging deployments. The staging hostname is served with `noindex, nofollow` so it is not indexed as the public site.
 
 ## What an editor needs
 
@@ -28,8 +28,8 @@ The CMS is configured to use `OB33WAN/Prestige-Flow-CMS` on `main`. Its OAuth Wo
 
 1. The editor opens `/admin/`, signs in with their own GitHub account, and selects **Service pages**, **Industry pages**, or **Area pages**.
 2. They create or edit a draft and choose **Ready for review**. Decap creates a pull request in GitHub.
-3. You review the draft and the automated **build** check. Merge only when you are happy with the copy and SEO fields.
-4. Merging updates the source repo only. To put the approved page on the public website, prepare and upload the website build through Octopye/EasyPanel. The existing Upload deployment remains in place; GitHub does not trigger a website deployment.
+3. You review the draft and the automated **cms-file-scope** and **build** checks. The `main` branch must require one code-owner approval before a pull request can merge.
+4. After you approve and merge the pull request, EasyPanel's GitHub webhook automatically deploys that commit to staging. No ZIP upload is part of this workflow. To reach the live apex domain later, deliberately attach/configure that domain to the approved production deployment; merging here does not point the apex at staging.
 
 Do not use numeric prices, payment promises, unverified accreditations, guarantees, testimonials or unsupported location claims in new page copy. Use the approved service rates and existing booking/contact links. The build rejects placeholder copy, weak pages, invalid internal links and conflicting routes.
 
@@ -37,6 +37,19 @@ Do not use numeric prices, payment promises, unverified accreditations, guarante
 
 - The Cloudflare Worker must have `GITHUB_OAUTH_ID` and `GITHUB_OAUTH_SECRET` set as Worker secrets and the custom domain `cms-auth.prestigeflow.co.uk` serving HTTPS.
 - The Worker must respond at `/` and redirect `/auth?provider=github` to GitHub. Its message allowlist includes the apex, `www`, `test` and `staging` website origins.
-- The CMS editor page must load at the intended website origin before you share that link. Test sign-in, a draft pull request, the build check, review/merge, and the separate website upload before treating the workflow as ready for the agency.
+- The CMS editor page must load at the staging origin before you share that link. Test sign-in, a draft pull request, both checks, owner review/merge, and automatic staging deployment before treating the workflow as ready for the agency.
 - GitHub Actions runs `npm ci`, `npm run test:cms`, `npm run build`, and `npm run check` for pull requests and pushes to `main`.
 - In GitHub, protect `main`: require a pull request, one approval from a code owner, and successful `cms-file-scope` and `build` checks before merging. The repository contains `.github/CODEOWNERS` to request your review. Do not grant the agency repository write access.
+
+## EasyPanel staging deployment
+
+On the existing `old-web` service, choose **Source → GitHub** and configure:
+
+- Repository: `OB33WAN/Prestige-Flow-CMS`
+- Branch: `main`
+- Build path: `/`
+- Builder: **Dockerfile**
+- Dockerfile path: `deploy/easypanel/site.Dockerfile`
+- Auto Deploy: enabled (GitHub webhook)
+
+Save and deploy once to publish the editor at the staging URL. Keep the service's domains limited to staging/test and its EasyPanel hostname; do not attach `prestigeflow.co.uk` or `www.prestigeflow.co.uk` to this staging service. Do not put Stripe, SMTP, API, or database secrets in this public website service.
