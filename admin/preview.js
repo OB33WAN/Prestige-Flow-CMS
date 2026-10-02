@@ -100,6 +100,7 @@
         var pageMarkup = currentPagePreview(entry, collectionName);
         if (pageMarkup) {
           return elementFactory('div', {
+            id: 'root',
             className: 'cms-source-page-preview',
             dangerouslySetInnerHTML: { __html: pageMarkup }
           });

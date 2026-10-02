@@ -49,6 +49,7 @@ try {
   assert.match(snapshots.areas.overview, /postcode coverage/iu, 'The Areas preview retains its complete coverage content.');
   assert.match(snapshots.areas.overview, /£144\.00/u, 'Owner-controlled rate content remains visible in the page preview.');
   assert.match(cmsPreview, /dangerouslySetInnerHTML/u, 'Existing pages render their complete page markup in the side preview.');
+  assert.match(cmsPreview, /id: 'root'/u, 'Existing page previews retain the site root styling context.');
   assert.match(cmsConfig, /preview_path: 'services\/\{\{slug\}\}\//u, 'Service records map to their live page routes.');
   assert.match(cmsConfig, /preview_path: 'industries\/\{\{slug\}\}\//u, 'Industry records map to their live page routes.');
   assert.match(cmsConfig, /preview_path: 'areas\/'/u, 'The current Areas overview links to /areas/.');
