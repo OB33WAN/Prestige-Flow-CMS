@@ -5,6 +5,7 @@ interface Env {
 }
 
 const allowedCmsOrigins = new Set([
+	'http://localhost:4173',
 	'https://prestigeflow.co.uk',
 	'https://www.prestigeflow.co.uk',
 	'https://test.prestigeflow.co.uk',

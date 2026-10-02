@@ -18,6 +18,6 @@ npm run typecheck
 npm run deploy
 ```
 
-The Worker uses a short-lived, HttpOnly, Secure, SameSite=Lax state cookie and rejects callback requests whose OAuth `state` does not match. It returns the GitHub token only to the configured Prestige Flow CMS origins. Add any future CMS origin to `allowedCmsOrigins` in `src/index.ts` before using it.
+The Worker uses a short-lived, HttpOnly, Secure, SameSite=Lax state cookie and rejects callback requests whose OAuth `state` does not match. It returns the GitHub token only to the configured Prestige Flow CMS origins. The exact `http://localhost:4173` origin is included for local editor testing; keep local CMS preview on that port and add no wildcard localhost origins. Add any future CMS origin to `allowedCmsOrigins` in `src/index.ts` before using it.
 
 The source repository is `OB33WAN/Prestige-Flow-CMS` (`main`). The CMS editor is served at `/admin/` on the website host; that path must be present in the current website deployment before editors can open it. Deploy the website CMS configuration only after the Worker hostname is serving HTTPS.
