@@ -1,6 +1,6 @@
 # Prestige Flow CMS and website source
 
-GitHub is used for Decap CMS content editing, draft review, and source control. It does not host or automatically deploy the public website. EasyPanel remains the website host and the current Upload deployment remains in place.
+GitHub is used for Decap CMS content editing, draft review, and source control. It does not host or automatically deploy the public website. Octopye Digital Designs remains the website host and the current Upload deployment remains in place.
 
 This repository contains the public site templates, assets, content collections, and CMS build tools because the CMS needs them to create and validate pages. CRM and payments API code are separate and intentionally excluded.
 
