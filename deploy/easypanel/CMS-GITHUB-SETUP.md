@@ -2,7 +2,7 @@
 
 ## What the CMS does
 
-The CMS is an editing screen for drafting new service, industry and area pages. Editors enter page copy and SEO fields in a web form; Decap saves a draft in GitHub and opens a pull request for review. Only after you approve and merge that pull request to protected `main` does EasyPanel automatically build and deploy the approved content to staging. The apex/live domain is not attached to this service.
+The CMS is an editing screen for drafting new service, industry and area pages. Editors enter page copy and SEO fields in a web form; Decap saves a draft in GitHub and opens a pull request for review. Once the setup below is completed, only after you approve and merge that pull request to protected `main` will EasyPanel automatically build and deploy the approved content to staging. The apex/live domain is not attached to this service.
 
 The CMS is currently for **new** SEO landing pages. The existing hand-built pages are not editable from this screen. Prices, payment terms, canonical rules, redirects and structured data stay centrally managed and are checked by the build.
 
@@ -12,7 +12,7 @@ Editors will use:
 
 `https://staging.prestigeflow.co.uk/admin/`
 
-The EasyPanel `old-web` service currently serves this hostname. Configure the service's source as the public GitHub repository and deploy the first build; after that, merges to `main` trigger staging deployments. The staging hostname is served with `noindex, nofollow` so it is not indexed as the public site.
+The EasyPanel `old-web` service currently serves this hostname, but its source is still **Upload**, so `/admin/` is not available on staging yet. Configure the service's source as the public GitHub repository and deploy the first build; after that, merges to `main` trigger staging deployments. The staging hostname is configured for `noindex, nofollow` in the site build.
 
 ## What an editor needs
 
@@ -43,7 +43,7 @@ Do not use numeric prices, payment promises, unverified accreditations, guarante
 
 ## EasyPanel staging deployment
 
-On the existing `old-web` service, choose **Source → GitHub** and configure:
+**Pending activation:** On the existing `old-web` service, choose **Source → GitHub** and configure:
 
 - Repository: `OB33WAN/Prestige-Flow-CMS`
 - Branch: `main`
