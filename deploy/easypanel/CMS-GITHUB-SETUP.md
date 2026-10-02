@@ -20,6 +20,8 @@ For a staging check, use `https://staging.prestigeflow.co.uk/admin/` if that sta
 - Access to the editor link after deployment.
 - To sign in, they choose GitHub and authorize the Prestige Flow CMS OAuth app. With Open Authoring they submit drafts from their own fork as pull requests; they do not get permission to write to `main`.
 
+The GitHub repository is public so the agency can inspect the HTML, CSS, JavaScript and other website source. They can read or fork it, but should not be given repository write access. The CMS editor exposes the content fields only. The `CMS file scope` check rejects pull requests that change anything beyond page Markdown in `content/cms/` and image files in `assets/cms/`; in particular, it blocks website HTML, CSS, JavaScript, Stripe/payment logic, API configuration and email links.
+
 The CMS is configured to use `OB33WAN/Prestige-Flow-CMS` on `main`. Its OAuth Worker is `https://cms-auth.prestigeflow.co.uk`; the Worker source and deployment instructions are in `deploy/cloudflare/cms-auth/`. The GitHub OAuth app callback must remain `https://cms-auth.prestigeflow.co.uk/callback`. Keep `GITHUB_OAUTH_SECRET` only in the Cloudflare Worker secret settings.
 
 ## Review and publishing steps
@@ -37,3 +39,4 @@ Do not use numeric prices, payment promises, unverified accreditations, guarante
 - The Worker must respond at `/` and redirect `/auth?provider=github` to GitHub. Its message allowlist includes the apex, `www`, `test` and `staging` website origins.
 - The CMS editor page must load at the intended website origin before you share that link. Test sign-in, a draft pull request, the build check, review/merge, and the separate website upload before treating the workflow as ready for the agency.
 - GitHub Actions runs `npm ci`, `npm run test:cms`, `npm run build`, and `npm run check` for pull requests and pushes to `main`.
+- In GitHub, protect `main`: require a pull request, one approval from a code owner, and successful `cms-file-scope` and `build` checks before merging. The repository contains `.github/CODEOWNERS` to request your review. Do not grant the agency repository write access.

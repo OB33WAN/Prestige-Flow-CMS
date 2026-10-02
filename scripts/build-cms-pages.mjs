@@ -13,6 +13,20 @@ const escape = (value) => String(value ?? '').replace(/[&<>"']/gu, (char) => ({ 
 const wordCount = (value) => String(value ?? '').trim().split(/\s+/u).filter(Boolean).length;
 const fail = (file, message) => { throw new Error(`CMS page ${path.relative(root, file)}: ${message}`); };
 
+function validateContentLinks(body, file) {
+  for (const token of markdown.parse(body, {})) {
+    if (token.type !== 'inline') continue;
+    for (const child of token.children ?? []) {
+      if (child.type === 'image') fail(file, 'Add images through the Hero image field, not inside page copy.');
+      if (child.type !== 'link_open') continue;
+      const href = child.attrGet('href') ?? '';
+      if (!/^\/(?!\/)[a-z0-9/_-]*\/?$/iu.test(href)) {
+        fail(file, 'Page copy may link only to an internal site path; email, telephone, payment and external links are centrally managed.');
+      }
+    }
+  }
+}
+
 async function listMarkdown(dir) {
   try {
     const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -42,12 +56,16 @@ async function renderPage(type, data, file) {
   const sectionHtml = data.sections.map((section, index) => {
     const headingText = validateString(section?.heading, `Section ${index + 1} heading`, file, { max: 100 });
     const body = validateString(section?.body, `Section ${index + 1} content`, file, { min: 100, max: 7000 });
+    validateContentLinks(body, file);
     return `<section class="cms-content-section"><h2>${escape(headingText)}</h2>${markdown.render(body)}</section>`;
   }).join('\n');
   const allCopy = [title, description, heading, intro, ...data.sections.map((section) => section.body)].join(' ');
   if (wordCount(allCopy) < 300) fail(file, `Page copy must contain at least 300 words (currently ${wordCount(allCopy)}).`);
-  if (/£\s*\d|\bGBP\s*\d|\b\d+(?:\.\d+)?\s*(?:plus\s+VAT|per\s+(?:hour|hr)|\/(?:hour|hr))|\b\d+%\s+deposit|\b(?:prices?|pricing|rates?|fees?|charges?|deposit|VAT)\b/iu.test(allCopy)) {
-    fail(file, 'Pricing and payment terms are centrally managed; remove rates, deposit amounts and payment promises from this page.');
+  if (/£\s*\d|\bGBP\s*\d|\b\d+(?:\.\d+)?\s*(?:plus\s+VAT|per\s+(?:hour|hr)|\/(?:hour|hr))|\b\d+%\s+deposit|\b(?:prices?|pricing|rates?|fees?|charges?|deposit|VAT|payments?|stripe|checkout|API|webhook)\b/iu.test(allCopy)) {
+    fail(file, 'Pricing, payment and API content is centrally managed; remove it from this page.');
+  }
+  if (/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/iu.test(allCopy)) {
+    fail(file, 'Email addresses and email links are centrally managed; remove them from this page.');
   }
 
   const heroImage = String(data.hero_image ?? '').trim();

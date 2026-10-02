@@ -47,8 +47,20 @@ try {
   await fs.writeFile(source, fields.replace(paragraph, `£120/hr ${paragraph}`), 'utf8');
   let rejected = false;
   try { execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' }); }
-  catch (error) { rejected = /Pricing and payment terms are centrally managed/u.test(String(error.stderr)); }
+  catch (error) { rejected = /Pricing, payment and API content is centrally managed/u.test(String(error.stderr)); }
   assert.ok(rejected, 'Build must reject CMS content that introduces rates or payment promises.');
+
+  await fs.writeFile(source, fields.replace(paragraph, `${paragraph} [Contact by email](mailto:info@example.com)`), 'utf8');
+  rejected = false;
+  try { execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' }); }
+  catch (error) { rejected = /email, telephone, payment and external links are centrally managed/u.test(String(error.stderr)); }
+  assert.ok(rejected, 'Build must reject email, telephone, payment and external links in CMS copy.');
+
+  await fs.writeFile(source, fields.replace(paragraph, `${paragraph} Contact our team at info@example.com`), 'utf8');
+  rejected = false;
+  try { execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' }); }
+  catch (error) { rejected = /Email addresses and email links are centrally managed/u.test(String(error.stderr)); }
+  assert.ok(rejected, 'Build must reject new email addresses in CMS copy.');
   console.log('PASS: CMS page generation, SEO metadata, internal links, safe Markdown and pricing controls.');
 } finally {
   await fs.rm(source, { force: true });
