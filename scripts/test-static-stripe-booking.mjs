@@ -26,11 +26,9 @@ const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, timezoneId: 'Europe/London' });
   const errors = [];
-  let emailCalls = 0;
   let stripeCalls = 0;
   page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => localStorage.setItem('pf_cookie_consent', 'accepted'));
-  await page.route('https://api.web3forms.com/submit', async route => { emailCalls++; await route.fulfill({ json: { success: true } }); });
   await page.route('https://buy.stripe.com/**', async route => { stripeCalls++; await route.fulfill({ status: 200, contentType: 'text/html', body: '<title>Unexpected Stripe call</title>' }); });
 
   const sitemap = await fs.readFile(path.join(root, 'sitemap.xml'), 'utf8');
@@ -104,7 +102,7 @@ try {
     assert.equal(await page.locator('.pf-booking a[href="tel:+447743565339"]').count(), 1, 'Call option should be available');
     tested++;
   }
-  // Exercise the dedicated old-site payment service independently of the CRM.
+  // Exercise the dedicated old-site payment service.
   // The API is mocked here: this verifies the static UI request contract and
   // redirect without creating a real Stripe session or charge.
   const siteConfig = await fs.readFile(path.join(root, 'assets/site-config.js'), 'utf8');
@@ -121,6 +119,13 @@ try {
     apiPayload = route.request().postDataJSON();
     await route.fulfill({ contentType:'application/json', status:201, json:{accepted:true,emailQueued:true,bookingReference:'PF-TEST-12345678',checkoutUrl:'https://checkout.stripe.test/session',depositPence:1440} });
   });
+  let enquiryPayload = null;
+  await page.route('https://old-site-payments.test/api/public/enquiries', async route => {
+    const cors = {'Access-Control-Allow-Origin':base,'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Accept'};
+    if (route.request().method() === 'OPTIONS') return route.fulfill({status:204,headers:cors});
+    enquiryPayload = route.request().postDataJSON();
+    await route.fulfill({status:201,headers:{...cors,'Content-Type':'application/json'},json:{accepted:true,emailQueued:true}});
+  });
   await page.route('https://checkout.stripe.test/session', route => route.fulfill({ status:200,contentType:'text/html',body:'<title>Mock Stripe Checkout</title><h1>Stripe checkout mock</h1>' }));
   await page.goto(`${base}/booking/`);
   await page.locator('#pf-visit-date').fill('2027-10-25');
@@ -133,16 +138,25 @@ try {
   assert.equal(await page.locator('#pf-card-charge-consent').isChecked(), false, 'saved-card permission must remain an explicit optional opt-in');
   assert.match(await page.locator('.pf-booking').innerText(), /£14\.40/,'booking checkout shows 10% of the VAT-inclusive £144 first hour');
   assert.match(await page.locator('.pf-booking').innerText(), /charged immediately at checkout/i,'the deposit is charged immediately');
-  assert.match(await page.locator('.pf-booking').innerText(), /staff will arrange a refund manually/i,'the customer is told refunds are handled manually without CRM approval');
+  assert.match(await page.locator('.pf-booking').innerText(), /staff will arrange a refund manually/i,'the customer is told refunds are handled manually when needed');
   assert.match(await page.getByTestId('button-step4-pay').innerText(), /Pay 10% deposit securely/i);
   await Promise.all([page.waitForURL('https://checkout.stripe.test/session'),page.getByTestId('button-step4-pay').click()]);
   assert.equal(apiPayload?.service,'Drainage Service');
   assert.match(apiPayload?.sku,/^(?:LON|REG)-DRAIN-DAY$/);
   assert.equal(apiPayload?.card_charge_consent,false);
-  assert.equal(emailCalls,0,'old-site booking notification must go through backend SMTP, not Web3Forms');
   assert.equal(stripeCalls, 0, 'Old Stripe links must not be used with the new rates');
+  await page.goto(`${base}/contact/`);
+  const contactForm = page.locator('form[data-static-form="contact"]');
+  await contactForm.locator('input[name="name"]').fill('QA Contact');
+  await contactForm.locator('input[name="email"]').fill('qa@example.com');
+  await contactForm.locator('input[name="subject"]').fill('Enquiry API test');
+  await contactForm.locator('textarea[name="message"]').fill('Checking that the enquiry form submits through the old-site API.');
+  await contactForm.locator('button[type="submit"]').click();
+  await page.getByText(/Thanks, your request has been sent to Prestige Flow/).waitFor();
+  assert.equal(enquiryPayload?.form_type,'contact');
+  assert.equal(enquiryPayload?.fields?.email,'qa@example.com');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${routes.length} sitemap pages and ${pricingTables} unified rate tables checked; ${tested} offline booking cases stay disabled without Stripe; the connected-flow mock verifies a 10% VAT-inclusive deposit, optional saved-card opt-in, SMTP notification through the old-site API, no Web3Forms call, and Stripe Checkout redirect.`);
+  console.log(`PASS: ${routes.length} sitemap pages and ${pricingTables} unified rate tables checked; ${tested} offline booking cases stay disabled without Stripe; connected booking and contact forms use the old-site API, with the booking mock verifying the 10% VAT-inclusive deposit, optional saved-card opt-in, SMTP notification, and Stripe Checkout redirect.`);
 } finally {
   await browser.close();
   await new Promise(resolve => server.close(resolve));

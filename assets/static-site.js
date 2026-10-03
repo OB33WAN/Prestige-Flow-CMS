@@ -1,11 +1,5 @@
 (() => {
   const DEFAULT_CONFIG = {
-    web3forms: {
-      accessKey: '',
-      endpoint: 'https://api.web3forms.com/submit',
-      fromName: 'Prestige Flow Website',
-      businessEmail: 'info@prestigeflow.co.uk'
-    },
     reviews: {
       google: {
         endpoint: '',
@@ -26,14 +20,12 @@
         'cctv-survey': ''
       }
     },
-    crm: { apiBaseUrl: '' },
     oldSitePayments: { apiBaseUrl: '' }
   };
 
   const mergeConfig = (base, incoming) => ({
     ...base,
     ...incoming,
-    web3forms: { ...base.web3forms, ...(incoming?.web3forms || {}) },
     reviews: {
       ...base.reviews,
       ...(incoming?.reviews || {}),
@@ -53,13 +45,11 @@
         ...(incoming?.stripe?.paymentLinksBySku || {})
       }
     },
-    crm: { ...base.crm, ...(incoming?.crm || {}) },
     oldSitePayments: { ...base.oldSitePayments, ...(incoming?.oldSitePayments || {}) }
   });
 
   const config = mergeConfig(DEFAULT_CONFIG, window.PrestigeFlowConfig || {});
-  // The old site's payment service is separate from the new site and CRM.
-  const crmApiBaseUrl = String(config.crm?.apiBaseUrl || '').trim().replace(/\/+$/, '');
+  // The old site's booking and enquiry service is separate from the CMS.
   const oldSitePaymentsApiBaseUrl = String(config.oldSitePayments?.apiBaseUrl || '').trim().replace(/\/+$/, '');
 
   const onReady = (fn) => {
@@ -127,7 +117,7 @@
       }
       liveRatesLoaded = true;
       applyRegionToPage(getStoredRegion());
-    } catch (_) { /* Show the approved fallback prices until the CRM is reachable. */ }
+    } catch (_) { /* Keep the approved fallback prices if live rates are unavailable. */ }
   };
   const PERIOD_BADGE_LABELS = {
     daytime: 'Daytime Rate (8am-6pm)',
@@ -219,44 +209,6 @@
     }
   };
 
-  const submitCRMIntake = async (payload) => {
-    const baseUrl = crmApiBaseUrl;
-    if (!isConfigured(baseUrl)) return null;
-    const url = new URL(baseUrl);
-    if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
-      throw new Error('The CRM connection must use HTTPS.');
-    }
-    const normalized = {
-      form_type: payload.form_type || 'enquiry',
-      name: payload.name || payload.full_name || '',
-      email: payload.email || '',
-      phone: payload.phone || payload.telephone || '',
-      address: payload.address || '',
-      postcode: payload.postcode || '',
-      date: payload.date || '',
-      time: payload.time || '',
-      notes: payload.notes || payload.message || payload.details || '',
-      service: payload.service || '',
-      region: payload.region || '',
-      rate_period: payload.rate_period || '',
-      sku: payload.sku || '',
-      reference: payload.reference || '',
-      card_charge_consent: payload.card_charge_consent === true,
-      source: payload.source || window.location.href,
-      website: payload.website || ''
-    };
-    const response = await withTimeout(fetch(new URL('/api/public/intake', url.origin), {
-      method: 'POST',
-      mode: 'cors',
-      credentials: 'omit',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(normalized)
-    }), 15000);
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || result.accepted !== true) throw new Error(result.error || 'CRM could not save the enquiry.');
-    return result;
-  };
-
   const submitOldSiteBooking = async (payload) => {
     if (!isConfigured(oldSitePaymentsApiBaseUrl)) throw new Error('The old-site payment service is not connected.');
     const url = new URL(oldSitePaymentsApiBaseUrl);
@@ -275,11 +227,10 @@
     if (!isConfigured(oldSitePaymentsApiBaseUrl)) throw new Error('The old-site email service is not connected.');
     const url = new URL(oldSitePaymentsApiBaseUrl);
     if (url.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(url.hostname)) throw new Error('The old-site email connection must use HTTPS.');
-    const { access_key, from_name, replyto, ccemail, ...fields } = payload;
     const response = await withTimeout(fetch(new URL('/api/public/enquiries', url.origin), {
       method: 'POST', mode: 'cors', credentials: 'omit',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ form_type: payload.form_type, fields, source: payload.source, website: payload.website || '' })
+      body: JSON.stringify({ form_type: payload.form_type, fields: payload, source: payload.source, website: payload.website || '' })
     }), 20000);
     const result = await response.json().catch(() => ({}));
     if (!response.ok || result.accepted !== true) throw new Error(result.error || 'Your request could not be emailed.');
@@ -720,7 +671,7 @@
     }, { passive: true });
   };
 
-  const setupWeb3Forms = () => {
+  const setupEnquiryForms = () => {
     const forms = Array.from(document.querySelectorAll('form[data-static-form]'));
     if (!forms.length) return;
 
@@ -731,8 +682,8 @@
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
 
-        if (!isConfigured(config.web3forms.accessKey) && !isConfigured(crmApiBaseUrl) && !isConfigured(oldSitePaymentsApiBaseUrl)) {
-          setFormStatus(statusEl, 'error', 'Form is not configured yet.');
+        if (!isConfigured(oldSitePaymentsApiBaseUrl)) {
+          setFormStatus(statusEl, 'error', 'The enquiry service is not connected yet. Please call 07743 565339.');
           return;
         }
 
@@ -747,59 +698,23 @@
         const email = String(formData.get('email') || '').trim();
         const formType = formTypeFromElement(form);
 
-        if (!isConfigured(oldSitePaymentsApiBaseUrl)) payload.access_key = config.web3forms.accessKey;
-        payload.subject = 'Prestige Flow ' + formType.toUpperCase() + ' submission';
-        payload.from_name = config.web3forms.fromName;
-        payload.botcheck = '';
         payload.source = window.location.href;
         payload.form_type = formType;
         payload.submitted_at = new Date().toISOString();
-        if (email) {
-          payload.replyto = email;
-          payload.ccemail = email;
-        }
 
-        let crmPromise = Promise.resolve(null);
         try {
-          if (isConfigured(crmApiBaseUrl)) crmPromise = submitCRMIntake(payload);
-          const emailPromise = isConfigured(oldSitePaymentsApiBaseUrl)
-            ? submitOldSiteEnquiry(payload).then(result => ({ ok: true, result }))
-            : isConfigured(config.web3forms.accessKey) ? fetch(config.web3forms.endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-              body: JSON.stringify(payload)
-            }).then(async response => {
-              const result = await response.json().catch(() => ({}));
-              return { ok: response.ok && result.success === true, result };
-            }) : Promise.resolve({ ok: false, result: {} });
-          const [emailResult, crmResult] = await Promise.allSettled([emailPromise, crmPromise]);
-          let emailSent = false;
-          let emailResponse = {};
-          if (emailResult.status === 'fulfilled') {
-            emailResponse = emailResult.value?.result || {};
-            emailSent = emailResult.value?.ok === true;
-          }
-          const crmSaved = crmResult.status === 'fulfilled' && crmResult.value !== null;
-          if (!emailSent && !crmSaved) {
-            throw new Error('Request could not be sent or saved.');
-          }
+          await submitOldSiteEnquiry(payload);
           trackConversion('generate_lead', {
             lead_type: formType,
-            lead_destination: crmSaved && emailSent ? 'crm_and_email' : crmSaved ? 'crm' : 'email'
+            lead_destination: 'old_site_api'
           });
-          if (crmResult.status === 'rejected') {
-            setFormStatus(statusEl, 'error', emailSent
-              ? 'Your request reached our email, but did not sync to the CRM. Please call 07743 565339 to make sure it is logged.'
-              : 'Your request could not be saved to the CRM. Please try again or call 07743 565339.');
-            return;
-          }
           setFormStatus(
             statusEl,
             'success',
-            (crmSaved ? 'Thanks, your request has been added to the Prestige Flow CRM.' + (emailSent ? ' A confirmation email has also been sent.' : '') : 'Thanks, your request has been sent to Prestige Flow.' + (email ? ' A confirmation copy will be emailed to you.' : ''))
+            'Thanks, your request has been sent to Prestige Flow.' + (email ? ' A confirmation email will be sent to you.' : '')
           );
           form.reset();
-        } catch (error) {
+        } catch (_) {
           setFormStatus(statusEl, 'error', 'Could not send your request right now. Please call 07743 565339.');
         } finally {
           if (submitBtn) {
@@ -1268,7 +1183,7 @@
         payBtn.disabled = true;
         if (note) note.textContent = 'Preparing secure Stripe checkout redirect…';
         try {
-          if (!isConfigured(config.web3forms.accessKey) && !isConfigured(oldSitePaymentsApiBaseUrl)) throw new Error('Booking service unavailable');
+          if (!isConfigured(oldSitePaymentsApiBaseUrl)) throw new Error('Booking service unavailable');
           const reference = 'PF-' + crypto.randomUUID();
           const cardChargeConsent = mainCard.querySelector('#pf-card-charge-consent')?.checked === true;
           const bookingDepositAmount = dynamicBookingCheckout ? money(depositPence) : 'Not applicable';
@@ -1285,46 +1200,30 @@
             remaining_balance_due: remainingBalanceInstructions,
             source: window.location.origin + '/booking/' };
           const tasks = [];
-          if (isConfigured(config.web3forms.accessKey) && !dynamicBookingCheckout) tasks.push(withTimeout(fetch(config.web3forms.endpoint, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({ access_key: config.web3forms.accessKey, subject: 'Prestige Flow booking request ' + reference,
-              from_name: config.web3forms.fromName, botcheck: '', ...customerDetails, replyto: customerDetails.email,
-              service: SERVICE_LABEL[selectedService], region: regionLabel, rate_period: period, rate_period_label: PERIOD_LABEL[period],
-              sku, reference, first_hour_including_vat: money(firstHourTotalPence), deposit_amount: bookingDepositAmount, deposit_percentage: bookingDepositPercentage,
-              card_charge_consent: cardChargeConsent,
-              remaining_balance_due: remainingBalanceInstructions,
-          payment_status: dynamicBookingCheckout ? `10% deposit (${money(depositPence)}) is charged immediately at Stripe Checkout; if the requested slot is rejected, staff arrange the refund manually in Stripe. Remaining labour charged at completion only with explicit saved-card consent. Parts excluded.` : legacyStripeCheckout ? `Customer is being redirected to the existing Stripe Payment Link for the ${isFixed ? 'fixed survey rate' : 'first-hour service rate'}. Payment is immediate at Stripe checkout. Appointment availability must be confirmed separately.` : 'No payment is authorised or captured; checkout is not connected.' })
-          }).then(async response => ({ kind: 'email', ok: response.ok && (await response.json().catch(() => ({}))).success === true })), 15000));
           if (dynamicBookingCheckout) tasks.push(submitOldSiteBooking(bookingPayload).then(result => ({ kind: 'old-site-payment', ok: true, emailQueued: result.emailQueued === true, paymentUrl: result.checkoutUrl, bookingReference: result.bookingReference })));
           const outcomes = await Promise.allSettled(tasks);
-          const emailResult = outcomes.find(result => result.status === 'fulfilled' && result.value.kind === 'email');
-          const crmResult = outcomes.find(result => result.status === 'fulfilled' && result.value.kind === 'old-site-payment');
-          const emailSent = (emailResult?.status === 'fulfilled' && emailResult.value.ok) || (crmResult?.status === 'fulfilled' && crmResult.value.emailQueued);
-          const crmSaved = Boolean(crmResult);
-          if (dynamicBookingCheckout && !crmSaved) throw new Error('Your email may have been sent, but secure checkout could not be started. No payment was taken; please call 07743 565339.');
-          if (!emailSent && !crmSaved) throw new Error('Booking request could not be emailed or saved.');
+          const apiResult = outcomes.find(result => result.status === 'fulfilled' && result.value.kind === 'old-site-payment');
+          const emailSent = apiResult?.status === 'fulfilled' && apiResult.value.emailQueued;
+          const apiSaved = Boolean(apiResult);
+          if (dynamicBookingCheckout && !apiSaved) throw new Error('Your request could not be saved or checkout started. No payment was taken; please call 07743 565339.');
+          if (!emailSent && !apiSaved) throw new Error('Booking request could not be emailed or saved.');
           trackConversion('generate_lead', {
             lead_type: 'booking',
             service_type: selectedService,
             service_area: selectedRegion,
-            lead_destination: crmSaved && emailSent ? 'crm_and_email' : crmSaved ? 'crm' : 'email'
+            lead_destination: 'old_site_api'
           });
-          if (isConfigured(oldSitePaymentsApiBaseUrl) && dynamicBookingCheckout && !crmSaved) {
-            mainCard.innerHTML = cardShell('Booking Request Needs Follow-up', 'The email request was sent, but this booking did not sync to the CRM. Please call us to confirm it is logged.', iconCheck, `<p class="text-sm">No payment was taken. Call <a href="tel:+447743565339">07743 565339</a> and give us your preferred visit time: ${escapeHtml(customerDetails.date)} at ${escapeHtml(customerDetails.time)} UK time.</p>`, '');
-            return;
-          }
-          const crmOutcome = outcomes.find(result => result.status === 'fulfilled' && result.value.kind === 'old-site-payment');
-          const dynamicPaymentUrl = crmOutcome?.status === 'fulfilled' ? crmOutcome.value.paymentUrl : '';
+          const dynamicPaymentUrl = apiResult?.status === 'fulfilled' ? apiResult.value.paymentUrl : '';
           if (dynamicPaymentUrl) {
             window.location.assign(dynamicPaymentUrl);
             return;
           }
           if (!checkoutReady || dynamicBookingCheckout) {
-            const checkoutFailed = crmOutcome?.status === 'fulfilled' && crmOutcome.value.checkoutError;
+            const checkoutFailed = apiResult?.status === 'fulfilled' && apiResult.value.checkoutError;
             const paymentMessage = checkoutFailed
               ? 'Your booking request was saved, but secure deposit checkout could not be started. No payment was taken. Please call 07743 565339 so we can help complete your booking.'
               : 'No payment was authorized or taken; payment arrangements will be confirmed with you separately.';
-            mainCard.innerHTML = cardShell('Request Received', `Thank you — your booking request was ${crmSaved ? 'saved in our CRM and ' : ''}sent to Prestige Flow. It is not a confirmed appointment and no payment was taken. Call us on 07743 565339 to arrange and confirm your visit. ${paymentMessage}`, iconCheck, `<p class="text-sm">Call <a href="tel:+447743565339">07743 565339</a> to arrange your visit.</p>`, '');
+            mainCard.innerHTML = cardShell('Request Received', `Thank you — your booking request was ${apiSaved ? 'saved and ' : ''}sent to Prestige Flow. It is not a confirmed appointment and no payment was taken. Call us on 07743 565339 to arrange and confirm your visit. ${paymentMessage}`, iconCheck, `<p class="text-sm">Call <a href="tel:+447743565339">07743 565339</a> to arrange your visit.</p>`, '');
             return;
           }
           const checkout = new URL(destination);
@@ -1576,7 +1475,7 @@
     setupRegionSelectorButtons();
     setupAutomaticRegionPricing();
     setupHeaderScroll();
-    setupWeb3Forms();
+    setupEnquiryForms();
     setupBookingPaymentFallback();
     setupGoogleReviewSummary();
     const instagramFallback = document.querySelector("[data-pf-instagram-fallback]");

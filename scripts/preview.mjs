@@ -5,13 +5,6 @@ import process from 'node:process';
 
 const rootDir = path.resolve(process.cwd(), '.public-site');
 const port = Number(process.env.PORT || 4173);
-const crmApiBaseUrl = String(process.env.CRM_API_BASE_URL || '').trim().replace(/\/+$/, '');
-if (crmApiBaseUrl) {
-  const apiUrl = new URL(crmApiBaseUrl);
-  if (apiUrl.protocol !== 'https:' && !(apiUrl.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(apiUrl.hostname))) {
-    throw new Error('CRM_API_BASE_URL must use HTTPS (HTTP is allowed only for localhost development).');
-  }
-}
 
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -45,14 +38,6 @@ function resolveFilePath(urlPath) {
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url || '/', `http://${request.headers.host}`);
   try {
-    if (url.pathname === '/assets/site-config.js' && crmApiBaseUrl) {
-      const configPath = path.join(rootDir, 'assets', 'site-config.js');
-      const source = await fs.readFile(configPath, 'utf8');
-      const override = `\nwindow.PrestigeFlowConfig = window.PrestigeFlowConfig || {};\nwindow.PrestigeFlowConfig.crm = { ...(window.PrestigeFlowConfig.crm || {}), apiBaseUrl: ${JSON.stringify(crmApiBaseUrl)} };\n`;
-      response.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
-      response.end(source + override);
-      return;
-    }
     const filePath = resolveFilePath(url.pathname);
     const data = await fs.readFile(filePath);
     const extension = path.extname(filePath).toLowerCase();

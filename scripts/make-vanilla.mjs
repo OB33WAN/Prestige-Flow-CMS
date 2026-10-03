@@ -174,15 +174,10 @@ function ensureStaticAssets($) {
 async function writeStaticAssets() {
   await fs.mkdir(path.dirname(staticScriptPath), { recursive: true });
   const siteConfig = {
-    web3forms: {
-      accessKey: process.env.WEB3FORMS_ACCESS_KEY || 'REPLACE_ME_WEB3FORMS_ACCESS_KEY',
-      endpoint: 'https://api.web3forms.com/submit',
-      fromName: 'Prestige Flow Website',
-      businessEmail: 'info@prestigeflow.co.uk'
-    },
+    oldSitePayments: { apiBaseUrl: '' },
     stripe: {
       publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || 'REPLACE_ME_STRIPE_PUBLISHABLE_KEY',
-      secretKeyNotice: 'Do not place STRIPE_SECRET_KEY in static files. Use Stripe Payment Links or a secure backend.',
+      secretKeyNotice: 'Do not place STRIPE_SECRET_KEY in static files. Use a secure backend.',
       paymentLinks: {
         default: process.env.STRIPE_PAYMENT_LINK_DEFAULT || 'REPLACE_ME_STRIPE_PAYMENT_LINK_DEFAULT',
         drainage: process.env.STRIPE_PAYMENT_LINK_DRAINAGE || '',
@@ -197,12 +192,6 @@ async function writeStaticAssets() {
 
   const js = `(() => {
   const DEFAULT_CONFIG = {
-    web3forms: {
-      accessKey: '',
-      endpoint: 'https://api.web3forms.com/submit',
-      fromName: 'Prestige Flow Website',
-      businessEmail: 'info@prestigeflow.co.uk'
-    },
     stripe: {
       publishableKey: '',
       secretKeyNotice: 'Do not place STRIPE_SECRET_KEY in static files. Use Stripe Payment Links or a secure backend.',
@@ -219,7 +208,6 @@ async function writeStaticAssets() {
   const mergeConfig = (base, incoming) => ({
     ...base,
     ...incoming,
-    web3forms: { ...base.web3forms, ...(incoming?.web3forms || {}) },
     stripe: {
       ...base.stripe,
       ...(incoming?.stripe || {}),
@@ -463,77 +451,39 @@ async function writeStaticAssets() {
     }, { passive: true });
   };
 
-  const setupWeb3Forms = () => {
+  const setupEnquiryForms = () => {
     const forms = Array.from(document.querySelectorAll('form[data-static-form]'));
-    if (!forms.length) return;
-
     forms.forEach((form) => {
       const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
       const statusEl = createFormStatus(form);
-
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
-
-        if (!isConfigured(config.web3forms.accessKey)) {
-          setFormStatus(statusEl, 'error', 'Form is not configured yet. Add WEB3FORMS_ACCESS_KEY in assets/site-config.js.');
+        const apiOrigin = String(config.oldSitePayments?.apiBaseUrl || '').trim().replace(/\/+$/, '');
+        if (!apiOrigin) {
+          setFormStatus(statusEl, 'error', 'The enquiry service is not connected yet. Please call 07743 565339.');
           return;
         }
-
         const oldBtnText = submitBtn?.textContent || '';
-        if (submitBtn) {
-          submitBtn.disabled = true;
-          submitBtn.textContent = 'Sending...';
-        }
-
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Sending...'; }
         const formData = new FormData(form);
         const payload = Object.fromEntries(formData.entries());
-        const email = String(formData.get('email') || '').trim();
-        const formType = formTypeFromElement(form);
-
-        payload.access_key = config.web3forms.accessKey;
-        payload.subject = 'Prestige Flow ' + formType.toUpperCase() + ' submission';
-        payload.from_name = config.web3forms.fromName;
-        payload.botcheck = '';
         payload.source = window.location.href;
-        payload.form_type = formType;
+        payload.form_type = formTypeFromElement(form);
         payload.submitted_at = new Date().toISOString();
-        if (email) {
-          payload.replyto = email;
-          payload.ccemail = email;
-        }
-
         try {
-          const response = await fetch(config.web3forms.endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json'
-            },
-            body: JSON.stringify(payload)
+          const response = await fetch(new URL('/api/public/enquiries', apiOrigin), {
+            method: 'POST', mode: 'cors', credentials: 'omit',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ form_type: payload.form_type, fields: payload, source: payload.source, website: payload.website || '' })
           });
-
           const result = await response.json().catch(() => ({}));
-          if (!response.ok || result.success === false) {
-            throw new Error(result.message || 'Submission failed');
-          }
-
-          const emailLine = email
-            ? ' A confirmation copy has been requested for ' + email + '.'
-            : ' Add your email in the form to receive a confirmation copy.';
-
-          setFormStatus(
-            statusEl,
-            'success',
-            'Thanks, your request was sent to ' + config.web3forms.businessEmail + '.' + emailLine
-          );
+          if (!response.ok || result.accepted !== true) throw new Error(result.error || 'Submission failed');
+          setFormStatus(statusEl, 'success', 'Thanks, your request has been sent to Prestige Flow.');
           form.reset();
-        } catch (error) {
+        } catch (_) {
           setFormStatus(statusEl, 'error', 'Could not send your request right now. Please call 07743 565339.');
         } finally {
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = oldBtnText;
-          }
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = oldBtnText; }
         }
       });
     });
@@ -599,7 +549,7 @@ async function writeStaticAssets() {
     setupComboboxFallbacks();
     setupMenuButtonFallbacks();
     setupHeaderScroll();
-    setupWeb3Forms();
+    setupEnquiryForms();
     setupBookingPaymentFallback();
   });
 })();
