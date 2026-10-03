@@ -16,6 +16,7 @@
     "cms:build": "node scripts/build-cms-pages.mjs",
     "cms:preview-snapshots": "node scripts/generate-cms-preview-snapshots.mjs",
     "cms:import-current": "node scripts/import-current-cms-pages.mjs",
+    "cms:backfill-copy": "node scripts/backfill-current-page-copy.mjs",
     "test:cms": "node scripts/test-cms-pages.mjs",
     "build": "node scripts/build-cms-pages.mjs && node scripts/generate-sitemap.mjs && node scripts/generate-nginx-redirects.mjs && node scripts/generate-cms-preview-snapshots.mjs && node scripts/build.mjs",
     "check": "node scripts/check-site.mjs && npm run links:audit",

@@ -53,10 +53,12 @@ try {
   assert.match(cmsPreview, /currentPagePreview\(entry, collectionName, this\.props\)/u, 'Existing page previews receive Decap image assets.');
   assert.match(cmsPreview, /intro\.insertAdjacentElement\('afterend', figure\)/u, 'Uploaded images appear in current-page side previews.');
   assert.match(cmsPreview, /registerPreviewStyle\('\/admin\/preview\.css\?v=2'\)/u, 'CMS previews load responsive sizing and control styles.');
+  assert.match(cmsPreview, /faq-answer/u, 'The page preview applies current CMS FAQ fields.');
   assert.match(await fs.readFile(path.join(root, 'admin', 'preview.css'), 'utf8'), /min-width:\s*0\s*!important/u, 'Wide pricing tables can fit the responsive preview viewport.');
   assert.match(cmsConfig, /preview_path: 'services\/\{\{slug\}\}\//u, 'Service records map to their live page routes.');
   assert.match(cmsConfig, /preview_path: 'industries\/\{\{slug\}\}\//u, 'Industry records map to their live page routes.');
   assert.match(cmsConfig, /preview_path: 'areas\/'/u, 'The current Areas overview links to /areas/.');
+  assert.match(cmsConfig, /allow_add: false\s+allow_remove: false\s+allow_reorder: false/u, 'Existing page copy fields cannot be added, removed or reordered in the editor.');
   for (const collection of ['current_services', 'current_industries', 'current_areas', 'services', 'industries', 'areas']) {
     assert.ok(cmsPreview.includes("registerPreviewTemplate('" + collection + "'"), `CMS has a branded preview for ${collection}.`);
   }
@@ -80,6 +82,64 @@ try {
   assert.deepEqual(builtService('link[rel="stylesheet"]').map((_, element) => builtService(element).attr('href')).get(), sourceService('link[rel="stylesheet"]').map((_, element) => sourceService(element).attr('href')).get(), 'Existing page stylesheets stay unchanged.');
   assert.equal(builtAreas('details').length, sourceAreas('details').length, 'Existing postcode groups remain unchanged.');
   assert.match(builtService('main').text(), /£120\s*\/\s*hour\s*\+\s*VAT|£120\/hr\s*\+\s*VAT/u, 'Existing service pricing stays in its owner-managed page section.');
+
+  for (const type of ['services', 'industries', 'areas']) {
+    const currentDir = path.join(root, 'content', 'cms', 'current', type);
+    for (const filename of await fs.readdir(currentDir)) {
+      if (!filename.endsWith('.md')) continue;
+      const slug = path.basename(filename, '.md');
+      const record = matter(await fs.readFile(path.join(currentDir, filename), 'utf8')).data;
+      const sourcePath = slug === 'overview'
+        ? path.join(root, type, 'index.html')
+        : path.join(root, type, slug, 'index.html');
+      const outputPath = slug === 'overview'
+        ? path.join(root, '.cms-generated-pages', type, 'index.html')
+        : path.join(root, '.cms-generated-pages', type, slug, 'index.html');
+      const sourcePage = load(await fs.readFile(sourcePath, 'utf8'));
+      const outputPage = load(await fs.readFile(outputPath, 'utf8'));
+      assert.ok(record.page_copy?.length > 0, `${type}/${slug} exposes additional existing page text in the CMS.`);
+      for (const field of record.page_copy) {
+        const [tag, index] = field.key.split(':');
+        const target = tag === 'faq-answer'
+          ? outputPage('main [data-testid^="text-answer"]').eq(Number(index)).find('.leading-relaxed')
+          : outputPage(`main ${tag}`).eq(Number(index));
+        assert.equal(target.text().trim(), field.text.trim(), `${type}/${slug} CMS field maps to its live page text: ${field.label}`);
+      }
+      if (type === 'areas') {
+        assert.equal(outputPage('details').length, sourcePage('details').length, 'Area postcode disclosures remain owner-controlled.');
+      }
+    }
+  }
+  const healthcareRecord = matter(await fs.readFile(path.join(root, 'content', 'cms', 'current', 'industries', 'healthcare.md'), 'utf8')).data;
+  assert.ok(healthcareRecord.page_copy.some((field) => field.text === 'Drainage'), 'Industry service card titles are available as editable copy.');
+  assert.ok(healthcareRecord.page_copy.some((field) => field.text === 'Plumbing'), 'Industry plumbing copy is represented in the CMS.');
+  assert.ok(healthcareRecord.page_copy.some((field) => field.text === 'CCTV surveys'), 'Industry CCTV copy is represented in the CMS.');
+  assert.ok(healthcareRecord.page_copy.some((field) => /Can you attend urgently\?/u.test(field.text)), 'Industry FAQs are represented in the CMS.');
+
+  const cctvRecordPath = path.join(root, 'content', 'cms', 'current', 'services', 'cctv-surveys.md');
+  const cctvRecordSource = await fs.readFile(cctvRecordPath, 'utf8');
+  const cctvRecord = matter(cctvRecordSource);
+  const editableQuestion = cctvRecord.data.page_copy.find((field) => field.key === 'h3:3');
+  const editableAnswer = cctvRecord.data.page_copy.find((field) => field.key === 'faq-answer:1');
+  assert.ok(editableQuestion && editableAnswer, 'Safe service FAQs include editable question and answer fields.');
+  editableQuestion.text = 'What is included in the camera survey?';
+  editableAnswer.text = 'The visit includes camera inspection and a clear explanation of the findings and next steps.';
+  try {
+    await fs.writeFile(cctvRecordPath, matter.stringify(cctvRecord.content, cctvRecord.data), 'utf8');
+    execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' });
+    const editedFaq = load(await fs.readFile(path.join(root, '.cms-generated-pages', 'services', 'cctv-surveys', 'index.html'), 'utf8'));
+    const questionButton = editedFaq('[data-testid="button-faq-1"]');
+    assert.equal(questionButton.text().trim(), editableQuestion.text, 'Editing an FAQ question preserves its accordion button and icon.');
+    assert.ok(questionButton.find('svg').length, 'FAQ question edits preserve the disclosure icon.');
+    assert.equal(editedFaq('[data-testid="text-answer-1"] .leading-relaxed').text().trim(), editableAnswer.text, 'FAQ answers are editable in the live page template.');
+    const schema = JSON.parse(editedFaq('script[type="application/ld+json"]').first().text());
+    const faqSchema = schema['@graph'].find((entity) => entity['@type'] === 'FAQPage');
+    assert.equal(faqSchema.mainEntity[1].name, editableQuestion.text, 'FAQ schema follows the edited visible question.');
+    assert.equal(faqSchema.mainEntity[1].acceptedAnswer.text, editableAnswer.text, 'FAQ schema follows the edited visible answer.');
+  } finally {
+    await fs.writeFile(cctvRecordPath, cctvRecordSource, 'utf8');
+    execFileSync(process.execPath, ['scripts/build-cms-pages.mjs'], { cwd: root, stdio: 'pipe' });
+  }
 
   const currentServiceFile = path.join(root, 'content', 'cms', 'current', 'services', 'drainage.md');
   const originalServiceRecord = await fs.readFile(currentServiceFile, 'utf8');

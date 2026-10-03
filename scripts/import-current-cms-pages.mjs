@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
 import { load } from 'cheerio';
+import { collectCurrentCopyFields } from './current-copy-fields.mjs';
 
 const root = process.cwd();
 const groups = ['services', 'industries'];
@@ -37,13 +38,8 @@ async function main() {
           page.description = 'CCTV drain surveys in Reading, Maidenhead and London for blockages, defects and recurring problems. Contact us to confirm scope, access and availability and request a visit.';
           page.service_summary = 'The survey provides clear camera findings across service areas. Contact us to confirm access, scope and appointment availability before booking.';
         }
-      } else {
-        page.sections = $('main h2').toArray().slice(0, 3).map((heading) => ({
-          heading: $(heading).text().trim(),
-          body: $(heading).closest('section').find('p').first().text().trim(),
-        }));
-        if (page.sections.length !== 3 || page.sections.some((section) => !section.body)) throw new Error(`Cannot identify industry copy sections: ${type}/${slug}`);
       }
+      page.page_copy = collectCurrentCopyFields($, type, slug);
       const outputFile = path.join(outputDir, `${slug}.md`);
       await fs.writeFile(outputFile, matter.stringify('', page), 'utf8');
       imported += 1;
@@ -58,6 +54,7 @@ async function main() {
     description: areas('meta[name="description"]').attr('content')?.trim() ?? '',
     heading: areaHeading.text().trim(),
     intro: areaHeading.next('p').text().trim(),
+    page_copy: collectCurrentCopyFields(areas, 'areas', 'overview'),
   };
   await fs.writeFile(path.join(root, 'content', 'cms', 'current', 'areas', 'overview.md'), matter.stringify('', areaOverview), 'utf8');
   imported += 1;
