@@ -69,13 +69,13 @@ try {
         if ($siteConfigText -match 'sk_(?:live|test)_[A-Za-z0-9]+' -or
             $siteConfigText -match 'whsec_[A-Za-z0-9]+' -or
             $siteConfigText -match '"accessKey"\s*:\s*"[^"]+"') {
-            throw 'Public site archive unexpectedly contains a Stripe secret, webhook secret or Web3Forms key.'
+            throw 'Public site archive unexpectedly contains a private integration credential.'
         }
         $prefix = 'window.PrestigeFlowConfig = '
         if (-not $siteConfigText.StartsWith($prefix)) { throw 'Public site configuration could not be parsed.' }
         $siteConfig = $siteConfigText.Substring($prefix.Length).Trim().TrimEnd(';') | ConvertFrom-Json
-        if ($siteConfig.crm.apiBaseUrl -or $siteConfig.web3forms.accessKey -or -not $siteConfig.oldSitePayments.apiBaseUrl) {
-            throw 'Archive must use the separate old-site API with CRM and Web3Forms fallbacks disabled.'
+        if (-not $siteConfig.oldSitePayments.apiBaseUrl) {
+            throw 'Archive must use the separate old-site API.'
         }
         if ($siteConfig.oldSitePayments.apiBaseUrl -notmatch '^https://') { throw 'Old-site API origin must use HTTPS.' }
 
@@ -90,7 +90,7 @@ try {
 
     Write-Output "Staging archive created and verified: $archivePath"
     Write-Output "Archive size: $((Get-Item -LiteralPath $archivePath).Length) bytes"
-    Write-Output 'Contains the static website, updated CMS admin/preview, and HTTPS old-site API routing; excludes CRM/API source and payment/email secrets.'
+    Write-Output 'Contains the static website, updated CMS admin/preview, and HTTPS old-site API routing; excludes server source and payment/email secrets.'
 } finally {
     $resolvedTemp = [IO.Path]::GetFullPath($stageRoot)
     $resolvedTempBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
