@@ -23,7 +23,7 @@ jobs:
               per_page: 100,
             });
             const allowed = /^(?:content\/cms\/(?:current\/(?:services|industries|areas)|services|industries|areas)\/[^/]+\.md|assets\/cms\/[A-Za-z0-9._/-]+\.(?:png|jpe?g|webp|avif|gif))$/i;
-            const ownerMaintenance = /^(?:\.github\/workflows\/cms-file-scope\.yml|admin\/(?:config\.yml|index\.html|preview\.js)|assets\/(?:site-config|static-site)\.js|deploy\/easypanel\/(?:configure-site-api\.mjs|create-staging-cms-archive\.ps1)|(?:README\.md|privacy\/index\.html)|package\.json|scripts\/(?:backfill-current-page-copy\.mjs|build-cms-pages\.mjs|current-copy-fields\.mjs|import-current-cms-pages\.mjs|make-vanilla\.mjs|preview\.mjs|test-booking\.mjs|test-cms-pages\.mjs|test-static-stripe-booking\.mjs))$/i;
+            const ownerMaintenance = /^(?:\.github\/workflows\/cms-file-scope\.yml|admin\/(?:config\.yml|index\.html|preview\.js)|assets\/(?:site-config|static-site)\.js|deploy\/easypanel\/(?:configure-site-api\.mjs|create-staging-cms-archive\.ps1)|(?:README\.md|privacy\/index\.html|sitemap\.xml)|package\.json|scripts\/(?:backfill-current-page-copy\.mjs|build-cms-pages\.mjs|current-copy-fields\.mjs|import-current-cms-pages\.mjs|make-vanilla\.mjs|preview\.mjs|test-booking\.mjs|test-cms-pages\.mjs|test-static-stripe-booking\.mjs))$/i;
             const isOwner = context.payload.pull_request.author_association === 'OWNER';
             const rejected = files.map(file => file.filename).filter(name =>
               !allowed.test(name) && !(isOwner && ownerMaintenance.test(name))
